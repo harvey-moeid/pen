@@ -1,0 +1,3 @@
+# Copy to .dev.vars, replace with independent random secrets (32+ characters).
+ADMIN_SECRET=
+WEBHOOK_SIGNING_SECRET=

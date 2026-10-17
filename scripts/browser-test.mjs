@@ -1,0 +1,301 @@
+import { chromium, expect as baseExpect } from '@playwright/test';
+import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { build } from 'esbuild';
+import { readFile, mkdir, mkdtemp, rm, access } from 'node:fs/promises';
+import { resolve, extname, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { createHmac, randomBytes } from 'node:crypto';
+import assert from 'node:assert/strict';
+
+const expect = baseExpect.configure({ timeout: 15000 });
+const out = resolve('artifacts');
+await mkdir(out, { recursive: true });
+const store = await mkdtemp(join(tmpdir(), 'pen-browser-'));
+const password = randomBytes(32).toString('hex'),
+  signing = randomBytes(32).toString('hex');
+const bundled = await build({
+  entryPoints: ['src/server/worker.ts'],
+  bundle: true,
+  write: false,
+  format: 'esm',
+  platform: 'neutral',
+  external: ['cloudflare:workers', 'node:crypto'],
+  conditions: ['workerd', 'worker', 'browser'],
+});
+const mime = {
+  '.js': 'text/javascript',
+  '.css': 'text/css',
+  '.html': 'text/html',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.png': 'image/png',
+};
+const root = resolve('dist');
+const mf = new Miniflare({
+  ...convertV4MiniflareOptions({
+    name: 'browser-test',
+    modules: true,
+    script: bundled.outputFiles[0].text,
+    compatibilityDate: '2026-10-17',
+    compatibilityFlags: ['nodejs_compat'],
+    durableObjects: { ROOMS: { className: 'MatchRoom', useSQLite: true } },
+    kvNamespaces: ['CONFIG'],
+    r2Buckets: ['MEDIA'],
+    bindings: { ADMIN_SECRET: password, WEBHOOK_SIGNING_SECRET: signing },
+    serviceBindings: {
+      ASSETS: async (request) => {
+        let path = resolve(root, '.' + decodeURIComponent(new URL(request.url).pathname));
+        if (!path.startsWith(root + '/')) path = join(root, 'index.html');
+        try {
+          await access(path);
+          if (!extname(path)) throw Error('SPA');
+        } catch {
+          path = join(root, 'index.html');
+        }
+        return new Response(await readFile(path), {
+          headers: { 'Content-Type': mime[extname(path)] ?? 'application/octet-stream' },
+        });
+      },
+    },
+  }),
+  resourcePersistencePath: store,
+});
+let browser;
+const checks = [],
+  errors = [],
+  networkErrors = [];
+try {
+  const base = (await mf.ready).origin;
+  const executablePath =
+    process.env.CHROMIUM_PATH ||
+    (await access('/usr/bin/chromium')
+      .then(() => '/usr/bin/chromium')
+      .catch(() => undefined));
+  browser = await chromium.launch({
+    executablePath,
+    headless: true,
+    args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-angle=swiftshader'],
+  });
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1100 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('requestfailed', (r) => {
+    if (!r.failure()?.errorText.includes('ABORTED')) networkErrors.push(r.url());
+  });
+  await page.goto(base, { waitUntil: 'networkidle' });
+  await expect(page.locator('.player-label')).toHaveCount(5);
+  await expect(page.locator('.arena-error')).toHaveCount(0);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.screenshot({ path: join(out, 'studio-desktop.png'), fullPage: true });
+  checks.push('Desktop 1440px: 5 clubs visible, no overflow');
+  await page.getByRole('button', { name: 'Reset simulasi' }).click();
+  await expect(page.locator('.player-label.active')).toHaveCount(0);
+  await page.waitForTimeout(500);
+  const initialPositions = await page.locator('.player-label').evaluateAll((nodes) =>
+    nodes.map((n) => ({
+      text: n.textContent,
+      x: n.getBoundingClientRect().x,
+      y: n.getBoundingClientRect().y,
+    })),
+  );
+  await page.getByLabel('Hasil uji simulasi').selectOption('GOAL');
+  await page.getByRole('button', { name: /Dragon Meteor/ }).click();
+  await expect(page.locator('.player-label.active')).toHaveText('RMA');
+  await page.waitForTimeout(2200);
+  const moving = await page.locator('.player-label.active').boundingBox();
+  assert.ok(moving.y < initialPositions[0].y - 15, 'Active player advances toward goal');
+  const otherLabels = await page.locator('.player-label:not(.active)').count();
+  assert.equal(otherLabels, 4);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: join(out, 'ultimate.png') });
+  await expect(
+    page.locator('.score-row').filter({ hasText: 'Madrid' }).locator(':scope > strong'),
+  ).toHaveText('1', { timeout: 15000 });
+  await expect(page.locator('.player-label.active')).toHaveCount(0, { timeout: 5000 });
+  await expect
+    .poll(async () => {
+      const returned = await page.locator('.player-label').first().boundingBox();
+      return Math.abs(returned.x - initialPositions[0].x);
+    })
+    .toBeLessThan(3);
+  checks.push('Ultimate: walks forward, other four remain, scores once, returns home');
+  await page.getByRole('button', { name: 'Reset simulasi' }).click();
+  await page.waitForTimeout(300);
+  await expect(
+    page.locator('.score-row').filter({ hasText: 'Madrid' }).locator(':scope > strong'),
+  ).toHaveText('0');
+  await page.getByLabel('Hasil uji simulasi').selectOption('SAVE');
+  await page.getByRole('button', { name: /Fire Shot/ }).click();
+  await expect(page.locator('.kick-announcement strong')).toHaveText('SAVE', { timeout: 10000 });
+  await page.waitForTimeout(1600);
+  await expect(
+    page.locator('.score-row').filter({ hasText: 'Madrid' }).locator(':scope > strong'),
+  ).toHaveText('0');
+  checks.push('Reset persists; forced SAVE yields no goal');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: join(out, 'studio-mobile.png'), fullPage: true });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  checks.push('Mobile 390px: all 5 clubs, no horizontal overflow');
+  // Auth is exercised through the visible form. These secrets exist only in this isolated runtime.
+  await page.goto(base + '/admin');
+  await page.getByLabel('Kunci admin').fill(password);
+  await page.getByRole('button', { name: 'Masuk ke control room' }).click();
+  await expect(page.getByRole('heading', { name: 'Ringkasan', exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: join(out, 'admin-dashboard.png'), fullPage: true });
+  for (const route of [
+    'integration',
+    'clubs',
+    'gifts',
+    'skills',
+    'goalkeeper',
+    'match',
+    'queue',
+    'leaderboard',
+    'visual',
+    'history',
+  ]) {
+    await page.goto(base + '/admin/' + route);
+    await expect(page.getByRole('button', { name: 'Simpan perubahan' })).toBeVisible();
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+      false,
+    );
+  }
+  checks.push('Admin login and all 11 admin routes render');
+  await page.goto(base + '/admin/skills');
+  await page.getByLabel('Peluang gol (%)').first().fill('61.5');
+  await page.getByRole('button', { name: 'Simpan perubahan' }).click();
+  await expect(page.getByRole('status')).toContainText('tersimpan');
+  await page.reload();
+  await expect(page.getByLabel('Peluang gol (%)').first()).toHaveValue('61.5');
+  checks.push('Admin edits persist and reload from server');
+  const data = await (await context.request.get(base + '/api/admin/state')).json();
+  data.config.sourceRoomId = '123';
+  data.config.match.countdownSec = 0;
+  data.config.match.mode = 'ENDLESS';
+  data.config.idle.enabled = false;
+  data.config.skills[1].goalChancePercent = 100;
+  data.config.skills[1].durationMs = 3000;
+  assert.equal(
+    (
+      await context.request.put(base + '/api/admin/config', {
+        headers: { Origin: base },
+        data: { version: data.configVersion, config: data.config },
+      })
+    ).status(),
+    200,
+  );
+  assert.equal(
+    (
+      await context.request.post(base + '/api/admin/control', {
+        headers: { Origin: base },
+        data: { action: 'start' },
+      })
+    ).status(),
+    200,
+  );
+  const hook = async (event, payload, id) => {
+    const body = JSON.stringify({
+        id,
+        version: 1,
+        event,
+        timestamp: new Date().toISOString(),
+        roomId: '123',
+        data: payload,
+      }),
+      stamp = String(Math.floor(Date.now() / 1000));
+    return context.request.post(base + '/api/hooks/tiktok', {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-tlk-timestamp': stamp,
+        'x-tlk-signature':
+          'sha256=' +
+          createHmac('sha256', signing)
+            .update(stamp + '.' + body)
+            .digest('hex'),
+      },
+      data: body,
+    });
+  };
+  await hook(
+    'chat',
+    { username: 'test-viewer', nickname: '<img src=x onerror=alert(1)>', message: 'BAR' },
+    'browser-comment',
+  );
+  await page.setViewportSize({ width: 540, height: 960 });
+  await page.goto(base + '/live');
+  await expect(page.locator('.player-label')).toHaveCount(5);
+  await expect(page.getByText('Arena tersambung', { exact: true })).toBeVisible();
+  await hook(
+    'gift',
+    {
+      username: 'test-viewer',
+      giftId: '5655',
+      diamondCount: 1,
+      repeatCount: 1,
+      repeatEnd: true,
+      giftType: 1,
+    },
+    'browser-gift',
+  );
+  await expect(page.locator('.player-label.active')).toHaveText('BAR');
+  await page.waitForTimeout(3500);
+  await expect(
+    page.locator('.live-scores>div').filter({ hasText: 'BAR' }).locator('strong'),
+  ).toHaveText('1');
+  assert.equal(await page.locator('img[src="x"]').count(), 0);
+  await page.screenshot({ path: join(out, 'live-portrait.png'), fullPage: true });
+  checks.push('Signed webhook → realtime overlay goal; supporter text cannot inject HTML');
+  const authoritativeBefore = await (await context.request.get(base + '/api/snapshot')).json();
+  await page.reload();
+  await expect(
+    page.locator('.live-scores>div').filter({ hasText: 'BAR' }).locator('strong'),
+  ).toHaveText('1');
+  const another = await context.newPage();
+  await another.goto(base + '/live');
+  await expect(
+    another.locator('.live-scores>div').filter({ hasText: 'BAR' }).locator('strong'),
+  ).toHaveText('1');
+  await another.close();
+  const after = await (await context.request.get(base + '/api/snapshot')).json();
+  assert.deepEqual(after.scores, authoritativeBefore.scores);
+  checks.push('Reload + second overlay recover consistent scores without replay');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: join(out, 'live-landscape.png'), fullPage: true });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  const bounds = await page.locator('.arena-canvas').boundingBox();
+  for (const label of await page.locator('.player-label').all()) {
+    const b = await label.boundingBox();
+    assert.ok(
+      b.x >= bounds.x &&
+        b.x + b.width <= bounds.x + bounds.width &&
+        b.y >= bounds.y &&
+        b.y + b.height <= bounds.y + bounds.height,
+      'Every club label inside arena',
+    );
+  }
+  checks.push('Landscape 1280×720: all clubs stay inside arena');
+  assert.deepEqual(errors, []);
+  assert.deepEqual(networkErrors, []);
+  const report = {
+    checks,
+    consoleErrors: errors,
+    networkErrors,
+    renderer: 'Headless Chromium / SwiftShader; not a production GPU benchmark',
+    fps: await page.locator('.arena-canvas').getAttribute('data-fps'),
+  };
+  await (
+    await import('node:fs/promises')
+  ).writeFile(join(out, 'browser-report.json'), JSON.stringify(report, null, 2));
+  console.log(JSON.stringify(report, null, 2));
+} finally {
+  await browser?.close();
+  await mf.dispose();
+  await rm(store, { recursive: true, force: true });
+}

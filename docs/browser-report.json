@@ -1,0 +1,17 @@
+{
+  "checks": [
+    "Desktop 1440px: 5 clubs visible, no overflow",
+    "Ultimate: walks forward, other four remain, scores once, returns home",
+    "Reset persists; forced SAVE yields no goal",
+    "Mobile 390px: all 5 clubs, no horizontal overflow",
+    "Admin login and all 11 admin routes render",
+    "Admin edits persist and reload from server",
+    "Signed webhook → realtime overlay goal; supporter text cannot inject HTML",
+    "Reload + second overlay recover consistent scores without replay",
+    "Landscape 1280×720: all clubs stay inside arena"
+  ],
+  "consoleErrors": [],
+  "networkErrors": [],
+  "renderer": "Headless Chromium / SwiftShader; not a production GPU benchmark",
+  "fps": "6"
+}
