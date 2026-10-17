@@ -57,9 +57,11 @@ Tiga job berjalan paralel pada Ubuntu 24.04 dan Node.js 24, menggunakan `npm ci`
 
 Job **CI passed** hanya berhasil jika ketiganya sukses; job gagal, dibatalkan, atau dilewati tidak dihitung lulus. Nama check ini dapat dipilih sebagai required status check pada ruleset branch `main`; workflow sendiri tidak mengaktifkan branch protection.
 
-Laporan `test-results` dan screenshot/laporan `browser-verification` tersedia di bagian **Artifacts** pada run selama 14 hari. Upload tetap dicoba saat tes gagal, untuk menyimpan hasil yang sempat dibuat. Run lama pada event dan branch yang sama dibatalkan ketika ada perubahan baru.
+Laporan `test-results` dan screenshot/laporan `browser-verification` tersedia di bagian **Artifacts** pada run selama 14 hari. Upload tetap dicoba saat tes gagal, untuk menyimpan hasil yang sempat dibuat. Build yang telah diuji disimpan sebagai `production-assets` selama 7 hari. Run lama pada branch selain `main` dibatalkan ketika ada perubahan baru; deployment `main` yang sedang berjalan tidak diputus.
 
-CI tidak membutuhkan GitHub secrets atau akun Cloudflare: tes memakai storage lokal terisolasi dan secret sementara. Workflow hanya memverifikasi kode, tanpa deploy produksi.
+Job CI tidak membutuhkan secret produksi: tes memakai storage lokal terisolasi dan secret sementara. Setelah **CI passed**, job **Deploy production** otomatis berjalan hanya untuk push atau pemicu manual di `main`. Pull request dan merge queue hanya menjalankan pemeriksaan.
+
+CD memakai artifact dari run yang sama, memasang secret runtime bersama versi Worker, lalu memeriksa health API, snapshot Durable Object, dan halaman `/live`. Deployment diserialkan dan commit lama yang sudah tertinggal dari `main` ditolak. Lihat [pengaturan empat secret GitHub dan resource produksi](docs/OPERATIONS.md#cd-github-actions).
 
 ## Arsitektur
 
@@ -91,9 +93,6 @@ Lihat [arsitektur dan aturan](docs/ARCHITECTURE.md), [audit konektor](docs/INTEG
 
 ```sh
 npx wrangler login
-npx wrangler kv namespace create CONFIG
-npx wrangler r2 bucket create penalty-battle-assets
-# Isi id namespace CONFIG pada wrangler.jsonc sesuai hasil provisioning.
 npx wrangler secret put ADMIN_SECRET
 npx wrangler secret put WEBHOOK_SIGNING_SECRET
 npm run build
@@ -101,7 +100,7 @@ npx wrangler deploy --dry-run
 npm run deploy
 ```
 
-`wrangler.jsonc` menyertakan migrasi SQLite Durable Object, static SPA assets, observability, KV, R2, dan deklarasi secret yang diperlukan. ID namespace sengaja belum terikat ke akun tertentu. Wrangler versi proyek juga mendukung provisioning KV otomatis; provisioning eksplisit mempermudah peninjauan akun dan resource.
+`wrangler.jsonc` menyertakan migrasi SQLite Durable Object, static SPA assets, observability, KV, R2, dan deklarasi secret yang diperlukan. Namespace KV `penalty-battle-3d-CONFIG` dan bucket `penalty-battle-assets` telah disiapkan di akun Cloudflare `harvey`. Gunakan akun tersebut untuk deploy; untuk akun lain, provision resource baru dan perbarui binding serta konfigurasi CD terlebih dahulu. CD dapat melakukan deploy pertama dengan empat secret GitHub, tanpa perintah lokal di atas.
 
 Setelah deploy, login admin, isi **Room ID TikTok sumber**, pilih **Gift ID Normal**, periksa mapping/kontribusi/probabilitas, lalu simpan dan mulai ronde. Tambahkan endpoint `/api/hooks/tiktok` pada dashboard konektor untuk event **chat, gift, stream**. Secret tidak boleh dimasukkan ke URL overlay atau source frontend.
 

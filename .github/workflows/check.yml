@@ -11,7 +11,8 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A new push must not interrupt an in-flight production deployment.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   CI: 'true'
@@ -102,6 +103,13 @@ jobs:
           path: artifacts/
           retention-days: 14
           if-no-files-found: warn
+      - name: Save the tested production assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-assets
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error
 
   ci:
     name: CI passed
@@ -129,3 +137,111 @@ jobs:
             echo '::error::All verification jobs must succeed.'
             exit 1
           fi
+
+  deploy:
+    name: Deploy production
+    needs: ci
+    if: >-
+      needs.ci.result == 'success' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://penalty-battle-3d.harveymoeid.workers.dev
+    concurrency:
+      group: penalty-battle-production
+      cancel-in-progress: false
+    env:
+      PRODUCTION_URL: https://penalty-battle-3d.harveymoeid.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Reject a superseded main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [[ "$GITHUB_SHA" != "$current_sha" ]]; then
+            echo '::error::This commit is no longer main. Run the workflow on the latest main commit.'
+            exit 1
+          fi
+      - name: Check production credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+          WEBHOOK_SIGNING_SECRET: ${{ secrets.WEBHOOK_SIGNING_SECRET }}
+        run: |
+          node --input-type=module <<'NODE'
+          const required = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'ADMIN_SECRET', 'WEBHOOK_SIGNING_SECRET'];
+          const missing = required.filter(name => !process.env[name]);
+          if (missing.length) throw new Error(`Add GitHub Actions secrets: ${missing.join(', ')}. See docs/OPERATIONS.md.`);
+          if (process.env.CLOUDFLARE_ACCOUNT_ID !== '07086b4d368d0a37ebcbbf186e51eecf') {
+            throw new Error('CLOUDFLARE_ACCOUNT_ID must match the account owning the configured KV and R2 resources.');
+          }
+          for (const name of ['ADMIN_SECRET', 'WEBHOOK_SIGNING_SECRET']) {
+            if (process.env[name].length < 32 || process.env[name].length > 512) {
+              throw new Error(`${name} must contain 32–512 characters.`);
+            }
+          }
+          if (process.env.ADMIN_SECRET === process.env.WEBHOOK_SIGNING_SECRET) {
+            throw new Error('ADMIN_SECRET and WEBHOOK_SIGNING_SECRET must be different.');
+          }
+          NODE
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Download production assets from this CI run
+        uses: actions/download-artifact@v4
+        with:
+          name: production-assets
+          path: dist/
+      - name: Deploy Worker and tested assets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+          WEBHOOK_SIGNING_SECRET: ${{ secrets.WEBHOOK_SIGNING_SECRET }}
+        run: |
+          secret_file=$(mktemp "$RUNNER_TEMP/penalty-secrets.XXXXXX.json")
+          trap 'rm -f "$secret_file"' EXIT
+          node --input-type=module - "$secret_file" <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          writeFileSync(process.argv[2], JSON.stringify({
+            ADMIN_SECRET: process.env.ADMIN_SECRET,
+            WEBHOOK_SIGNING_SECRET: process.env.WEBHOOK_SIGNING_SECRET,
+          }), { mode: 0o600 });
+          NODE
+          unset ADMIN_SECRET WEBHOOK_SIGNING_SECRET
+          npx --no-install wrangler deploy --secrets-file "$secret_file" --message "GitHub commit $GITHUB_SHA"
+      - name: Smoke test production
+        run: |
+          curl --fail --silent --show-error --retry 8 --retry-all-errors --retry-delay 5 --connect-timeout 5 --max-time 15 \
+            "$PRODUCTION_URL/api/health" --output "$RUNNER_TEMP/penalty-health.json"
+          jq --exit-status '.ok == true and .service == "penalty-battle"' "$RUNNER_TEMP/penalty-health.json"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 5 --max-time 15 \
+            "$PRODUCTION_URL/api/snapshot" --output "$RUNNER_TEMP/penalty-snapshot.json"
+          jq --exit-status 'has("scores") and has("clubs")' "$RUNNER_TEMP/penalty-snapshot.json"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout 5 --max-time 15 \
+            "$PRODUCTION_URL/live" --output "$RUNNER_TEMP/penalty-live.html"
+          grep -q 'id="root"' "$RUNNER_TEMP/penalty-live.html"
+      - name: Record deployment result
+        if: always()
+        env:
+          DEPLOY_STATUS: ${{ job.status }}
+        run: |
+          {
+            echo '## Production deployment'
+            echo
+            echo "Status: $DEPLOY_STATUS"
+            echo "Commit: $GITHUB_SHA"
+            echo "URL: $PRODUCTION_URL"
+            echo
+            echo 'A failed smoke test does not roll back code or storage automatically. See docs/OPERATIONS.md.'
+          } >> "$GITHUB_STEP_SUMMARY"

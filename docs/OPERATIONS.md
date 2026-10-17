@@ -3,10 +3,54 @@
 ## Persiapan
 
 1. Gunakan akun Cloudflare yang mendukung SQLite Durable Objects, KV, dan R2. Periksa biaya dan batas plan aktual pada dashboard; repo tidak mengasumsikan layanan gratis.
-2. Provision namespace KV CONFIG dan bucket R2 sesuai README. Isi ID KV hasil provisioning pada config, simpan di Git sebagai ID non-secret.
-3. Isi ADMIN_SECRET dan WEBHOOK_SIGNING_SECRET melalui `wrangler secret put`, bukan lewat source atau query URL. Gunakan nilai berbeda, acak, 32+ karakter.
-4. `npm ci && npm run check && npm run test:browser`, lalu `npx wrangler deploy --dry-run`. Deploy explicit dengan `npm run deploy`. GitHub CI melakukan pemeriksaan saja, **tidak otomatis deploy**.
+2. Binding KV dan R2 produksi sudah disiapkan pada akun di bawah. Jangan membuat namespace baru untuk setiap deploy; storage harus tetap sama.
+3. Isi ADMIN_SECRET dan WEBHOOK_SIGNING_SECRET melalui GitHub Actions secrets untuk CD, atau `wrangler secret put` untuk deploy lokal. Gunakan nilai berbeda, acak, 32–512 karakter; jangan lewat source atau query URL.
+4. CI menjalankan pemeriksaan sebelum CD. Untuk verifikasi lokal: `npm ci && npm run check && npm run test:browser`, lalu `npx wrangler deploy --dry-run`. Deploy lokal tersedia dengan `npm run deploy`.
 5. Buka admin melalui HTTPS, simpan source room, mapping normal, peluang/poin, queue dan mode ronde. Jangan menyalin cookie ke browser source publik.
+
+## CD GitHub Actions
+
+Workflow [Verify Penalty Battle](https://github.com/harvey-moeid/pen/actions/workflows/check.yml) memiliki job **Deploy production**, bergantung pada **CI passed**. Hanya push dan **Run workflow** pada `main` yang dapat deploy. Pull request, merge queue, branch lain, atau CI gagal tidak mendapat akses ke job deploy. Tidak ada pemicu `pull_request_target` atau eksekusi artifact dari fork.
+
+Resource produksi yang telah dibuat:
+
+| Resource                    | Nilai                                                           |
+| --------------------------- | --------------------------------------------------------------- |
+| Cloudflare account          | `harvey` — `07086b4d368d0a37ebcbbf186e51eecf`                   |
+| Worker                      | `penalty-battle-3d`                                             |
+| KV CONFIG                   | `penalty-battle-3d-CONFIG` — `9a2612fe04034f7e934f4f7865103c14` |
+| R2 MEDIA                    | `penalty-battle-assets` — APAC                                  |
+| GitHub environment          | `production`                                                    |
+| URL setelah deploy berhasil | `https://penalty-battle-3d.harveymoeid.workers.dev`             |
+
+### Pengaturan sekali saja
+
+Di [Settings → Secrets and variables → Actions](https://github.com/harvey-moeid/pen/settings/secrets/actions), tambahkan repository secrets berikut. Alternatifnya, simpan sebagai environment secrets pada `production`; nilai environment mengalahkan repository secret dengan nama sama.
+
+| Secret                   | Isi                                                                               |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`   | Token Cloudflare untuk deploy Workers pada akun `harvey`                          |
+| `CLOUDFLARE_ACCOUNT_ID`  | `07086b4d368d0a37ebcbbf186e51eecf`                                                |
+| `ADMIN_SECRET`           | Kunci operator acak, 32–512 karakter                                              |
+| `WEBHOOK_SIGNING_SECRET` | Kunci HMAC acak, berbeda dari kunci operator; samakan dengan konfigurasi konektor |
+
+Buat API token menggunakan template **Edit Cloudflare Workers**, batasi resource ke akun di atas, dan pastikan akses Workers Scripts serta binding Workers KV/R2 tersedia. Resource telah dibuat sehingga workflow tidak perlu membuat ulang KV/R2. Panduan resmi: [Cloudflare GitHub Actions authentication](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/). Jangan menyimpan token di file repo, log, atau chat.
+
+Setelah secret disimpan, buka **Actions → Verify Penalty Battle → Run workflow → main**. Untuk run yang hanya gagal karena secret kosong, **Re-run failed jobs** juga dapat dipakai selama artifact `production-assets` belum kedaluwarsa (7 hari) dan commit masih merupakan `main` terbaru. Jika tidak, jalankan workflow baru.
+
+### Perilaku deployment
+
+1. Ketiga job CI harus lulus. Artifact `production-assets` berisi frontend yang telah diuji browser, dari run yang sama; CD tidak membangun ulang frontend.
+2. Job memeriksa bahwa commit masih merupakan `main` terbaru serta keempat secret tersedia dan valid. Kekurangan secret menghasilkan kegagalan yang menyebut nama pengaturan, tanpa menampilkan nilainya.
+3. Wrangler versi lockfile membundel Worker dari commit yang sama dan mengunggahnya bersama static assets. Dua secret runtime dikirim menggunakan `--secrets-file` melalui file sementara berizin `0600`, lalu dihapus; file tidak masuk artifact atau Git.
+4. Deploy menyertakan commit SHA pada pesan versi Cloudflare. Job mengecek `/api/health`, `/api/snapshot`, dan `/live`, dengan retry terbatas selama propagasi. Pemeriksaan snapshot tidak menambah skor atau mengirim event gift.
+5. Ringkasan run mencatat status, commit, dan URL. Health/snapshot/HTML smoke test tidak membuktikan delivery TikTok LIVE, performa GPU, atau setiap operasi R2.
+
+Deployment hanya satu per satu. Run `main` yang sedang berjalan tidak dibatalkan oleh push baru; commit antrean yang sudah tertinggal ditolak sebelum deploy. GitHub dapat mengganti run pending dengan run terbaru. Menjalankan ulang commit lama tidak digunakan untuk rollback; buat revert commit pada `main` atau ikuti prosedur rollback di bawah.
+
+GitHub environment `production` dapat diberi aturan branch `main` dan required reviewers sesuai kebutuhan operator. Workflow tidak mengubah pengaturan proteksi repository. Secret runtime di GitHub menjadi sumber nilai saat CD; rotasi di dashboard Cloudflare saja akan ditimpa oleh deploy berikutnya, jadi perbarui GitHub dan konektor bersamaan.
+
+Jika smoke test gagal setelah upload, kode baru mungkin sudah aktif. Workflow melaporkan gagal dan **tidak otomatis rollback**, karena rollback kode tidak mengembalikan storage. Periksa log Worker sebelum melakukan pemulihan.
 
 ## OBS / TikTok LIVE Studio
 

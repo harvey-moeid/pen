@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "penalty-battle-3d",
+  "workers_dev": true,
   "main": "src/server/worker.ts",
   "compatibility_date": "2026-10-17",
   "compatibility_flags": ["nodejs_compat"],
@@ -27,6 +28,7 @@
   "kv_namespaces": [
     {
       "binding": "CONFIG",
+      "id": "9a2612fe04034f7e934f4f7865103c14",
     },
   ],
   "r2_buckets": [
