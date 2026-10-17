@@ -1,33 +1,131 @@
 name: Verify Penalty Battle
+
 on:
   push:
   pull_request:
+  merge_group:
+  workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
-  group: verify-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  CI: 'true'
+  WRANGLER_SEND_METRICS: 'false'
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  quality:
+    name: Code quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
-      - run: npm run cf:types
-      - run: git diff --exit-code worker-configuration.d.ts
-      - run: npm run format:check
-      - run: npm run check
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:browser
-      - run: npx wrangler deploy --dry-run
-      - uses: actions/upload-artifact@v4
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify generated Cloudflare types
+        run: |
+          npm run cf:types
+          git diff --exit-code -- worker-configuration.d.ts
+      - name: Check formatting
+        run: npm run format:check
+      - name: Check TypeScript
+        run: npm run typecheck
+      - name: Lint source and tests
+        run: npm run lint
+
+  tests:
+    name: Unit and integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Test game engine, adapter, and Worker runtime
+        run: npm test -- --reporter=default --reporter=junit --outputFile=artifacts/tests/junit.xml
+      - name: Upload test report
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: artifacts/tests/
+          retention-days: 14
+          if-no-files-found: warn
+
+  browser:
+    name: Build and browser tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build production assets
+        run: npm run build
+      - name: Validate Worker bundle without deploying
+        run: npx --no-install wrangler deploy --dry-run
+      - name: Install Chromium and system dependencies
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Test studio, overlay, and admin in Chromium
+        run: npm run test:browser
+      - name: Upload browser screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: browser-verification
           path: artifacts/
-          if-no-files-found: ignore
+          retention-days: 14
+          if-no-files-found: warn
+
+  ci:
+    name: CI passed
+    if: always()
+    needs: [quality, tests, browser]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require every verification job to pass
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+        run: |
+          {
+            echo '## Penalty Battle CI'
+            echo
+            echo '| Check | Result |'
+            echo '| --- | --- |'
+            echo "| Code quality | $QUALITY_RESULT |"
+            echo "| Unit and integration tests | $TESTS_RESULT |"
+            echo "| Build and browser tests | $BROWSER_RESULT |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$QUALITY_RESULT" != success || "$TESTS_RESULT" != success || "$BROWSER_RESULT" != success ]]; then
+            echo '::error::All verification jobs must succeed.'
+            exit 1
+          fi

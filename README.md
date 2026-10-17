@@ -1,5 +1,7 @@
 # Penalty Battle 3D
 
+[![CI](https://github.com/harvey-moeid/pen/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/harvey-moeid/pen/actions/workflows/check.yml)
+
 Arena penalti interaktif berbahasa Indonesia untuk TikTok LIVE, OBS, dan LIVE Studio. Implementasi awal [PRD v1.1](docs/PRD.md): **Workers + Durable Objects + KV + R2, tanpa D1**.
 
 Lima karakter klub berjejer menghadap satu gawang. Pemain aktif berjalan ke titik penalti, menendang, bereaksi, dan kembali ke slot asal. Skill memiliki gerak dan efek berbeda: api, lintasan petir melengkung, putaran phantom, serta meteor naga emas. Semua aset bawaan dibuat secara prosedural; tidak menyertakan logo resmi atau model pemain berlisensi.
@@ -40,6 +42,24 @@ npm run test:browser   # jalankan setelah build; membutuhkan Chromium
 Tes browser memakai Worker, KV, R2, dan Durable Object **terisolasi**, dengan secret acak sementara. Tidak memakai kredensial atau pertandingan produksi. Jika Chromium belum tersedia, jalankan `npx playwright install chromium`; atau set `CHROMIUM_PATH` ke browser lokal. Screenshot dan laporan tersimpan di `artifacts/` (tidak masuk Git).
 
 Tes meliputi combo final, prioritas mapping, peluang 0/100%, snapshot konfigurasi, pemisahan skor, anti-starvation, burst 500 aksi, penutupan ronde, pause/resume, retry bersamaan, restart runtime dengan storage persisten, WebSocket read-only, HMAC, auth/CSRF, serta upload R2.
+
+## CI GitHub Actions
+
+[Verify Penalty Battle](https://github.com/harvey-moeid/pen/actions/workflows/check.yml) otomatis berjalan pada setiap push, pull request, dan merge queue. Untuk menjalankan ulang secara manual, buka **Actions → Verify Penalty Battle → Run workflow** dan pilih branch.
+
+Tiga job berjalan paralel pada Ubuntu 24.04 dan Node.js 24, menggunakan `npm ci` dan cache npm:
+
+| Job                        | Pemeriksaan                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| Code quality               | Sinkronisasi tipe Cloudflare, Prettier, TypeScript, ESLint                     |
+| Unit and integration tests | Vitest untuk engine, adapter, dan runtime Worker; laporan JUnit                |
+| Build and browser tests    | Build produksi, dry-run Wrangler, instalasi Chromium, tes studio/overlay/admin |
+
+Job **CI passed** hanya berhasil jika ketiganya sukses; job gagal, dibatalkan, atau dilewati tidak dihitung lulus. Nama check ini dapat dipilih sebagai required status check pada ruleset branch `main`; workflow sendiri tidak mengaktifkan branch protection.
+
+Laporan `test-results` dan screenshot/laporan `browser-verification` tersedia di bagian **Artifacts** pada run selama 14 hari. Upload tetap dicoba saat tes gagal, untuk menyimpan hasil yang sempat dibuat. Run lama pada event dan branch yang sama dibatalkan ketika ada perubahan baru.
+
+CI tidak membutuhkan GitHub secrets atau akun Cloudflare: tes memakai storage lokal terisolasi dan secret sementara. Workflow hanya memverifikasi kode, tanpa deploy produksi.
 
 ## Arsitektur
 
