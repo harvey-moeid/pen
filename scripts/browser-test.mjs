@@ -158,6 +158,7 @@ try {
     'queue',
     'leaderboard',
     'visual',
+    'overlay',
     'history',
   ]) {
     await page.goto(base + '/admin/' + route);
@@ -167,7 +168,7 @@ try {
       false,
     );
   }
-  checks.push('Admin login and all 12 admin routes render');
+  checks.push('Admin login and all 13 admin routes render');
   await page.goto(base + '/admin/clubs');
   await expect(page.getByText('Logo klub berupa gambar (PNG/WebP/JPG, maks. 20 MB)')).toHaveCount(
     5,
@@ -184,6 +185,80 @@ try {
   await page.screenshot({ path: join(out, 'admin-likes.png'), fullPage: true });
   checks.push(
     'Admin like threshold and toggle persist; logo image and optional GLB labels are distinct',
+  );
+  const textOverlay = await context.newPage();
+  textOverlay.on('pageerror', (e) => errors.push(e.message));
+  await textOverlay.goto(base + '/live');
+  await expect(textOverlay.locator('[data-overlay-text="clubPrompt"]')).toHaveText(
+    'Pilih klub dulu!',
+  );
+  await page.goto(base + '/admin/overlay');
+  await page.getByLabel('Isi tulisan').fill('LIGA LIVE');
+  await page.getByLabel('Ukuran tulisan (%)').fill('150');
+  await page.getByLabel('Warna tulisan').evaluate((input) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '#ff8800');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.getByLabel('Bagian tulisan').selectOption('giftNotice');
+  await page.getByLabel('Isi tulisan').fill('<img src=x onerror=alert(1)>');
+  await page.getByLabel('Bagian tulisan').selectOption('queue');
+  await page.getByLabel('Isi tulisan').fill('Antrean siaran: {queue}');
+  await page.getByLabel('Bagian tulisan').selectOption('clubPrompt');
+  await page.getByLabel('Tampilkan tulisan ini').uncheck();
+  await page.getByLabel('Tampilkan daftar gift dan skill').uncheck();
+  await page.getByLabel('Tampilkan status koneksi').uncheck();
+  await page.getByRole('button', { name: 'Simpan perubahan' }).click();
+  await expect(page.getByRole('status')).toContainText('tersimpan');
+  await expect(textOverlay.locator('[data-overlay-text="title"]')).toHaveText('LIGA LIVE');
+  await expect(textOverlay.locator('[data-overlay-text="title"]')).toHaveCSS(
+    'color',
+    'rgb(255, 136, 0)',
+  );
+  assert.equal(
+    await textOverlay
+      .locator('[data-overlay-text="title"] > span')
+      .evaluate((el) => el.style.fontSize),
+    '1.5em',
+  );
+  await expect(textOverlay.locator('[data-overlay-text="clubPrompt"]')).toHaveCount(0);
+  await expect(textOverlay.locator('[data-overlay-text="giftNotice"]')).toHaveText(
+    '<img src=x onerror=alert(1)>',
+  );
+  await expect(textOverlay.locator('img[src="x"]')).toHaveCount(0);
+  await expect(textOverlay.locator('[data-overlay-text="queue"]')).toHaveText('Antrean siaran: 0');
+  await expect(textOverlay.locator('.live-gift-legend')).toHaveCount(0);
+  await expect(textOverlay.locator('.live-connections')).toHaveCount(0);
+  await textOverlay.setViewportSize({ width: 390, height: 844 });
+  assert.equal(
+    await textOverlay.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+    false,
+  );
+  await textOverlay.screenshot({ path: join(out, 'overlay-custom-mobile.png'), fullPage: true });
+  await page.reload();
+  await expect(page.getByLabel('Isi tulisan')).toHaveValue('LIGA LIVE');
+  await expect(page.getByLabel('Ukuran tulisan (%)')).toHaveValue('150');
+  await expect(page.getByLabel('Warna tulisan')).toHaveValue('#ff8800');
+  await page.screenshot({ path: join(out, 'admin-overlay.png'), fullPage: true });
+  checks.push(
+    'Overlay editor persists text/color/size; live updates without reload, hides sections, escapes HTML, and fits mobile',
+  );
+  await page.getByRole('button', { name: 'Pulihkan bagian ini', exact: true }).click();
+  await expect(page.getByLabel('Isi tulisan')).toHaveValue('PENALTY');
+  await expect(textOverlay.locator('[data-overlay-text="title"]')).toHaveText('LIGA LIVE');
+  await page.getByRole('button', { name: 'Pulihkan semua teks dan tampilan', exact: true }).click();
+  await page.getByRole('button', { name: 'Simpan perubahan' }).click();
+  await expect(page.getByRole('status')).toContainText('tersimpan');
+  await expect(textOverlay.locator('[data-overlay-text="title"]')).toHaveText('PENALTY');
+  await expect(textOverlay.locator('[data-overlay-text="clubPrompt"]')).toHaveText(
+    'Pilih klub dulu!',
+  );
+  await expect(textOverlay.locator('.live-gift-legend')).toHaveCount(1);
+  const afterTextReset = await (await context.request.get(base + '/api/admin/state')).json();
+  assert.deepEqual(afterTextReset.config.likes, { enabled: true, likesPerKick: 100 });
+  await textOverlay.close();
+  checks.push(
+    'Text reset stays local until save and restores overlay without changing like settings',
   );
   await page.goto(base + '/admin/skills');
   await page.getByLabel('Peluang gol (%)').first().fill('61.5');

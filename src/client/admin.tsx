@@ -17,6 +17,13 @@ import {
 import { ConfigSchema, defaultConfig, skillIds, type Config } from '../game/model';
 import type { Snapshot } from '../game/engine';
 import { api, useLive } from './hooks';
+import {
+  defaultOverlaySettings,
+  overlayTextDefinitions,
+  overlayTextKeys,
+  type OverlayTextKey,
+} from '../game/overlay';
+import { OverlayText, overlayVariables } from './overlay';
 import { Scoreboard, Connection, RoundTimer, Crest } from './components';
 type AdminData = {
   config: Config;
@@ -40,6 +47,7 @@ const pages = [
   ['queue', 'Antrean'],
   ['leaderboard', 'Leaderboard'],
   ['visual', 'Visual & audio'],
+  ['overlay', 'Teks overlay'],
   ['history', 'Riwayat'],
 ] as const;
 function Field({
@@ -120,6 +128,7 @@ export function Admin() {
     [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
     [busy, setBusy] = useState(false),
+    [overlayField, setOverlayField] = useState<OverlayTextKey>('title'),
     [integration, setIntegration] = useState<{
       configured: boolean;
       endpoint: string;
@@ -1061,6 +1070,181 @@ export function Admin() {
               Atur peluang gol
             </a>
           </section>
+        )}
+        {page === 'overlay' && (
+          <>
+            <section className="panel padded">
+              <div className="section-title">
+                <h3>Tulisan untuk siaran</h3>
+                <a className="button" href="/live" target="_blank" rel="noreferrer">
+                  Buka overlay <ExternalLink size={14} />
+                </a>
+              </div>
+              <p>
+                Pilih bagian tulisan, lalu ubah isi, warna, ukuran, atau tampil/sembunyikan.
+                Pratinjau di bawah mengikuti perubahan yang belum disimpan. Klik Simpan perubahan
+                untuk memperbarui overlay yang sedang tersambung.
+              </p>
+              <label className="field">
+                <span>Bagian tulisan</span>
+                <select
+                  value={overlayField}
+                  onChange={(e) => setOverlayField(e.target.value as OverlayTextKey)}
+                >
+                  {overlayTextKeys.map((key) => (
+                    <option key={key} value={key}>
+                      {overlayTextDefinitions[key].label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </section>
+            <div className="overlay-editor-grid">
+              <section className="panel padded">
+                <h3>{overlayTextDefinitions[overlayField].label}</h3>
+                <Toggle
+                  label="Tampilkan tulisan ini"
+                  value={draft.overlay.text[overlayField].visible}
+                  onChange={(value) =>
+                    edit((c) => {
+                      c.overlay.text[overlayField].visible = value;
+                    })
+                  }
+                />
+                <label className="field">
+                  <span>Isi tulisan</span>
+                  <textarea
+                    rows={4}
+                    maxLength={240}
+                    value={draft.overlay.text[overlayField].text}
+                    onChange={(e) =>
+                      edit((c) => {
+                        c.overlay.text[overlayField].text = e.target.value;
+                      })
+                    }
+                  />
+                </label>
+                <small>
+                  {draft.overlay.text[overlayField].text.length}/240 karakter.{' '}
+                  {overlayTextDefinitions[overlayField].help}
+                </small>
+                <div className="form-grid">
+                  <Field
+                    label="Ukuran tulisan (%)"
+                    value={draft.overlay.text[overlayField].sizePercent}
+                    min={50}
+                    max={200}
+                    onChange={(value) =>
+                      edit((c) => {
+                        c.overlay.text[overlayField].sizePercent = +value;
+                      })
+                    }
+                  />
+                  <Field
+                    label="Warna tulisan"
+                    type="color"
+                    value={draft.overlay.text[overlayField].color}
+                    onChange={(value) =>
+                      edit((c) => {
+                        c.overlay.text[overlayField].color = value;
+                      })
+                    }
+                  />
+                </div>
+                <p>
+                  100% mengikuti ukuran bawaan pada portrait/landscape. Angka 50–200% memperkecil
+                  atau memperbesar tulisan ini. Isi kosong menyembunyikan tulisan. HTML ditampilkan
+                  sebagai teks biasa.
+                </p>
+                <button
+                  className="button"
+                  onClick={() =>
+                    edit((c) => {
+                      c.overlay.text[overlayField] = defaultOverlaySettings().text[overlayField];
+                    })
+                  }
+                >
+                  Pulihkan bagian ini
+                </button>
+              </section>
+              <section className="panel padded">
+                <h3>Pratinjau tulisan</h3>
+                <p>
+                  Contoh tampilan dengan data pertandingan saat ini. Posisi dan ukuran dasar
+                  mengikuti bagian masing-masing pada overlay.
+                </p>
+                <div className="overlay-text-preview" aria-label="Pratinjau tulisan overlay">
+                  {draft.overlay.text[overlayField].visible &&
+                  draft.overlay.text[overlayField].text.trim() ? (
+                    <OverlayText
+                      settings={draft.overlay}
+                      name={overlayField}
+                      variables={
+                        snapshot
+                          ? overlayVariables(snapshot, {
+                              arenaStatus: 'Arena tersambung',
+                              kick: snapshot.active?.skill.label ?? 'Normal Kick',
+                              supporter: snapshot.active?.supporterName ?? 'Pendukung',
+                              winner: snapshot.result
+                                ? overlayVariables(snapshot).winner
+                                : 'Klub pemenang',
+                              notice: snapshot.notice?.text ?? 'Pilih klub dulu!',
+                            })
+                          : {}
+                      }
+                    />
+                  ) : (
+                    <small>Tulisan ini disembunyikan.</small>
+                  )}
+                </div>
+                <p>
+                  Nama klub diatur pada Klub, nama skill pada Skill & peluang, dan nama gift pada
+                  Mapping gift. Penanda seperti <code>{'{likes}'}</code> dan{' '}
+                  <code>{'{queue}'}</code> mengikuti angka game tanpa mengubah skor atau aturan
+                  pertandingan.
+                </p>
+              </section>
+            </div>
+            <section className="panel padded">
+              <h3>Kelompok informasi</h3>
+              <div className="form-grid">
+                {(
+                  [
+                    ['showClubCodes', 'Tampilkan daftar kode klub'],
+                    ['showGiftLegend', 'Tampilkan daftar gift dan skill'],
+                    ['showConnections', 'Tampilkan status koneksi'],
+                    ['showDetailedScores', 'Tampilkan klasemen detail landscape'],
+                    ['showNotices', 'Tampilkan pemberitahuan game'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <Toggle
+                    key={key}
+                    label={label}
+                    value={draft.overlay[key]}
+                    onChange={(value) =>
+                      edit((c) => {
+                        c.overlay[key] = value;
+                      })
+                    }
+                  />
+                ))}
+              </div>
+              <button
+                className="button"
+                onClick={() =>
+                  edit((c) => {
+                    c.overlay = defaultOverlaySettings();
+                  })
+                }
+              >
+                Pulihkan semua teks dan tampilan
+              </button>
+              <p>
+                Pemulihan masuk sebagai perubahan yang belum disimpan. Pengaturan pertandingan,
+                like, gift, klub, dan skor tetap memakai nilainya saat ini.
+              </p>
+            </section>
+          </>
         )}
         {page === 'visual' && (
           <section className="panel padded">

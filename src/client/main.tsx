@@ -25,19 +25,36 @@ import {
 } from './components';
 import { useDemo, useLive } from './hooks';
 import type { Outcome } from '../game/model';
+import { defaultOverlaySettings, type OverlaySettings } from '../game/overlay';
+import { OverlayText, overlayVariables } from './overlay';
 const Admin = React.lazy(() => import('./admin').then((m) => ({ default: m.Admin })));
 import './style.css';
-function Brand() {
+function Brand({
+  overlay,
+  variables = {},
+}: {
+  overlay?: OverlaySettings;
+  variables?: Record<string, string | number>;
+}) {
   return (
     <a className="brand" href="/">
       <div className="brand-mark">
         P<span>◆</span>
       </div>
       <div>
-        PENALTY
-        <span>
-          BATTLE <b>3D</b>
-        </span>
+        {overlay ? (
+          <>
+            <OverlayText settings={overlay} name="title" variables={variables} as="div" />
+            <OverlayText settings={overlay} name="subtitle" variables={variables} />
+          </>
+        ) : (
+          <>
+            PENALTY
+            <span>
+              BATTLE <b>3D</b>
+            </span>
+          </>
+        )}
       </div>
     </a>
   );
@@ -344,6 +361,10 @@ function Live() {
         <a href="/">Kembali ke studio</a>
       </div>
     );
+  const overlay = snapshot.overlay ?? defaultOverlaySettings();
+  const variables = overlayVariables(snapshot, {
+    arenaStatus: connection === 'connected' ? 'Arena tersambung' : 'Menghubungkan ulang',
+  });
   const metric = { GOALS: 'goals', SKILL_POINTS: 'skillPoints', GIFT_POINTS: 'giftPoints' }[
     snapshot.ranking
   ] as 'goals' | 'skillPoints' | 'giftPoints';
@@ -356,19 +377,29 @@ function Live() {
       style={{ '--safe-area': `${snapshot.visual.safeArea}%` } as React.CSSProperties}
     >
       <header className="live-header">
-        <Brand />
+        <Brand overlay={overlay} variables={variables} />
         <RoundTimer snapshot={snapshot} offset={offset.current} />
       </header>
-      <div className="live-connections">
-        <Connection
-          connected={connection === 'connected'}
-          label={connection === 'connected' ? 'Arena tersambung' : 'Menghubungkan ulang'}
-        />
-        <Connection
-          connected={snapshot.connector.status === 'CONNECTED'}
-          label={'Konektor ' + snapshot.connector.status.toLowerCase()}
-        />
-      </div>
+      {overlay.showConnections && (
+        <div className="live-connections">
+          {overlay.text.arenaConnection.visible && (
+            <Connection
+              connected={connection === 'connected'}
+              label={
+                <OverlayText settings={overlay} name="arenaConnection" variables={variables} />
+              }
+            />
+          )}
+          {overlay.text.connectorConnection.visible && (
+            <Connection
+              connected={snapshot.connector.status === 'CONNECTED'}
+              label={
+                <OverlayText settings={overlay} name="connectorConnection" variables={variables} />
+              }
+            />
+          )}
+        </div>
+      )}
       <div className="live-scores">
         {rankedClubs.map((c) => (
           <div key={c.id}>
@@ -382,43 +413,50 @@ function Live() {
         <ArenaView snapshot={snapshot} offset={offset.current} />
       </div>
       <div className="live-instructions">
-        <span className="eyebrow">
-          {snapshot.likes?.enabled
-            ? 'KOMENTAR KODE KLUB → LIKE / GIFT → TENDANG!'
-            : 'KOMENTAR KODE KLUB → KIRIM GIFT → TENDANG!'}
-        </span>
-        <strong>Pilih klub dulu!</strong>
-        <div className="club-codes">
-          {snapshot.clubs.map((c) => (
-            <span key={c.id}>{c.code}</span>
-          ))}
-        </div>
-        <p>Gift sebelum memilih klub tidak memicu aksi atau skor.</p>
+        <OverlayText settings={overlay} name="guide" variables={variables} className="eyebrow" />
+        <OverlayText settings={overlay} name="clubPrompt" variables={variables} as="strong" />
+        {overlay.showClubCodes && (
+          <div className="club-codes">
+            {snapshot.clubs.map((c) => (
+              <span key={c.id}>{c.code}</span>
+            ))}
+          </div>
+        )}
+        <OverlayText settings={overlay} name="giftNotice" variables={variables} as="p" />
         {snapshot.likes?.enabled && (
-          <p>
-            Setiap {snapshot.likes.likesPerKick} like per penonton → 1 tendangan normal untuk klub
-            pilihannya. Pilih klub sebelum memberi like!
-          </p>
+          <OverlayText settings={overlay} name="likeNotice" variables={variables} as="p" />
         )}
-        <div className="live-gift-legend">
-          {snapshot.giftLegend.map((s, i) => (
-            <span key={s.skillId} style={{ color: skillColors[i] }}>
-              {s.skillLabel}
-              <small>{s.triggers.length ? s.triggers.join(' / ') : 'Belum dipetakan'}</small>
-            </span>
-          ))}
-        </div>
+        {overlay.showGiftLegend && (
+          <div className="live-gift-legend">
+            {snapshot.giftLegend.map((s, i) => (
+              <span key={s.skillId} style={{ color: skillColors[i] }}>
+                {s.skillLabel}
+                <small>{s.triggers.length ? s.triggers.join(' / ') : 'Belum dipetakan'}</small>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="live-status">
-          <span>{snapshot.queueDepth} dalam antrean</span>
-          <span>PERINGKAT: {snapshot.ranking}</span>
+          <OverlayText settings={overlay} name="queue" variables={variables} />
+          <OverlayText settings={overlay} name="ranking" variables={variables} />
         </div>
-        {snapshot.notice && Date.now() + offset.current - snapshot.notice.at < 10000 && (
-          <div className="notice">{snapshot.notice.text}</div>
-        )}
+        {overlay.showNotices &&
+          snapshot.notice &&
+          Date.now() + offset.current - snapshot.notice.at < 10000 && (
+            <OverlayText
+              settings={overlay}
+              name="notice"
+              variables={variables}
+              as="div"
+              className="notice"
+            />
+          )}
       </div>
-      <div className="live-detailed">
-        <Scoreboard snapshot={snapshot} compact />
-      </div>
+      {overlay.showDetailedScores && (
+        <div className="live-detailed">
+          <Scoreboard snapshot={snapshot} compact />
+        </div>
+      )}
     </main>
   );
 }

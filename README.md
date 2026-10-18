@@ -29,6 +29,7 @@ npm run dev
 - `/admin`: login operator menggunakan `ADMIN_SECRET`; cookie HttpOnly, SameSite Strict, Secure di HTTPS.
 - Semua halaman admin: integrasi, klub, gift, skill, kiper, ronde, antrean, leaderboard, visual, riwayat.
 - `/admin/likes`: aktifkan like → Normal Kick dan tentukan ambang per penonton.
+- `/admin/overlay`: atur tulisan, warna, ukuran, dan visibilitas overlay.
 
 Pratinjau `/` juga berjalan tanpa backend setelah aset aplikasi dimuat. Pilih klub dan skill; dropdown **Hasil uji** dapat memaksa GOAL/SAVE/MISS untuk uji animasi. Tombol reset hanya mereset simulasi browser.
 
@@ -53,6 +54,16 @@ Hitungan berlaku **per penonton untuk klub yang sudah dipilih lewat komentar**, 
 Tendangan memakai peluang, poin saat gol, animasi, durasi, dan prioritas skill **NORMAL**. Skill harus aktif. Like tidak memerlukan Gift ID, tidak menambah poin gift, dan tetap melewati antrean serta dedup webhook. Saat kapasitas tidak cukup, seluruh event mendapat 503 tanpa menghabiskan sisa like; retry dengan ID sama dapat diterima setelah kapasitas tersedia. Petunjuk like otomatis tampil pada overlay saat fitur aktif.
 
 Logo klub opsional dan memakai **PNG, WebP, atau JPG**, maksimal 20 MB. **GLB hanya untuk model karakter 3D** pengganti; tanpa GLB, karakter bawaan tetap tersedia.
+
+## Teks overlay
+
+Di **Admin → Teks overlay**, pilih satu dari 24 bagian tulisan: judul/subjudul, petunjuk, label arena, nama pendukung/skill saat tendangan, hasil ronde, klasemen, antrean, dan status. Isi maksimal 240 karakter per bagian, warna HEX, ukuran relatif 50–200%, serta sakelar tampil/sembunyikan. Isi kosong juga menyembunyikan bagian tersebut.
+
+Pratinjau mengikuti draft; **Simpan perubahan** menerapkan teks ke overlay tersambung melalui WebSocket tanpa reload. **Pulihkan bagian ini** dan **Pulihkan semua teks dan tampilan** menyiapkan nilai bawaan sebagai draft sampai disimpan. Daftar kode klub, daftar gift/skill, koneksi, klasemen detail landscape, dan pemberitahuan dapat disembunyikan per kelompok. Nama klub/skill/gift tetap diatur di menu masing-masing.
+
+Penanda dinamis mengikuti game: `{likes}`, `{queue}`, `{ranking}`, `{quality}`, `{actions}`, `{supporter}`, `{source}`, `{kick}`, `{winner}`, `{arenaStatus}`, `{connectorStatus}`, `{roundStatus}`, dan `{notice}`. Contoh: `Setiap {likes} like = 1 tendangan` atau `Antrean: {queue}`. Penanda yang tidak dikenal tetap tampil apa adanya; HTML ditampilkan sebagai teks biasa. Pengaturan ini hanya memengaruhi tampilan, tidak mengubah peluang, skor, antrean, atau sisa like.
+
+Konfigurasi lama mendapat tulisan bawaan secara otomatis, tanpa menghapus state pertandingan. Screenshot editor tersedia di [pratinjau teks overlay](docs/screenshots/admin-overlay.png).
 
 ## CI GitHub Actions
 

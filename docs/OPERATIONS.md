@@ -58,6 +58,15 @@ Jika smoke test gagal setelah upload, kode baru mungkin sudah aktif. Workflow me
 - Hitungan per penonton setelah memilih klub. Contoh ambang 100: 250 like menghasilkan 2 tendangan dan sisa 50. Like sebelum pilih klub atau di luar LIVE/pause tidak dihitung. Ambang/toggle berubah, pindah klub, dan ronde baru/reset menghapus sisa; perubahan unrelated seperti volume tidak menghapus sisa.
 - **Admin → Klub**: logo menerima PNG/WebP/JPG, model karakter menerima GLB. Keduanya opsional, masing-masing maksimal 20 MB. Simpan konfigurasi setelah upload. Tombol logo/model bawaan menghapus referensi aset dari klub tanpa menghapus objek R2.
 
+## Teks overlay
+
+1. Buka **Admin → Teks overlay**, pilih **Bagian tulisan**, lalu edit isi, warna, ukuran 50–200%, atau sakelar tampil. Pratinjau memakai draft dan data pertandingan saat ini. Maksimal 240 karakter per bagian; teks boleh beberapa baris.
+2. Gunakan penanda yang dijelaskan di bawah editor: misalnya `{likes}` untuk ambang like dan `{queue}` untuk antrean. Nilai otomatis mengikuti game; jangan mengganti angka tersebut dengan nilai manual jika ingin tetap sinkron.
+3. Sesuaikan kelompok informasi yang ingin ditampilkan. Klik **Simpan perubahan**, kemudian cek `/live` portrait dan landscape. Tulisan diperbarui melalui WebSocket; overlay yang reconnect mengambil snapshot terbaru.
+4. **Pulihkan bagian ini** hanya memulihkan teks terpilih beserta warna/ukuran/visibilitasnya. **Pulihkan semua teks dan tampilan** memulihkan semua pengaturan overlay. Keduanya perlu disimpan untuk mengubah siaran; aturan pertandingan dan hitungan like tidak direset.
+
+Judul, label, dan petunjuk adalah teks biasa. Karakter seperti `<` atau `>` tidak menjadi HTML. Ukuran 100% mengikuti ukuran bawaan pada layout masing-masing. Tulisan panjang dan ukuran besar perlu diperiksa pada perangkat siaran; editor tidak mengatur posisi arena atau hasil game.
+
 ## OBS / TikTok LIVE Studio
 
 - Browser source: `https://<domain>/live`, portrait 1080×1920 atau landscape 1920×1080.

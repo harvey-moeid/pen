@@ -4,8 +4,10 @@
     "Ultimate: walks forward, other four remain, scores once, returns home",
     "Reset persists; forced SAVE yields no goal",
     "Mobile 390px: all 5 clubs, no horizontal overflow",
-    "Admin login and all 12 admin routes render",
+    "Admin login and all 13 admin routes render",
     "Admin like threshold and toggle persist; logo image and optional GLB labels are distinct",
+    "Overlay editor persists text/color/size; live updates without reload, hides sections, escapes HTML, and fits mobile",
+    "Text reset stays local until save and restores overlay without changing like settings",
     "Admin edits persist and reload from server",
     "Signed webhook → realtime overlay goal; supporter text cannot inject HTML",
     "Signed likes cross threshold once, show Normal Kick, preserve gift points, and deduplicate retry",
@@ -15,5 +17,5 @@
   "consoleErrors": [],
   "networkErrors": [],
   "renderer": "Headless Chromium / SwiftShader; not a production GPU benchmark",
-  "fps": "2"
+  "fps": "4"
 }

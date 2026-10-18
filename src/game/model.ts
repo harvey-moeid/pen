@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { defaultOverlaySettings, OverlaySchema } from './overlay';
 export const skillIds = ['NORMAL', 'SKILL_1', 'SKILL_2', 'SKILL_3', 'ULTIMATE'] as const;
 export const SkillIdSchema = z.enum(skillIds);
 export type SkillId = z.infer<typeof SkillIdSchema>;
@@ -58,6 +59,7 @@ export const ConfigSchema = z
     skills: z.array(SkillSchema).length(5),
     mappings: z.array(MappingSchema).max(100),
     coinFallback: z.boolean(),
+    overlay: OverlaySchema.default(defaultOverlaySettings),
     likes: z
       .object({
         enabled: z.boolean(),
@@ -234,6 +236,7 @@ export function defaultConfig(): Config {
       matchPriority: 10,
     })),
     coinFallback: true,
+    overlay: defaultOverlaySettings(),
     likes: defaultLikeSettings(),
     match: {
       mode: 'TIME',

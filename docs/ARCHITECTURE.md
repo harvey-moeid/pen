@@ -50,6 +50,8 @@ MVP memakai satu JSON snapshot per room di SQLite. Ini mudah diaudit dan dipulih
 
 ## Aset dan animasi
 
+Konfigurasi `overlay` berisi 24 bagian teks bernama, masing-masing memiliki isi, warna HEX, ukuran relatif 50–200%, dan visibilitas; juga lima sakelar kelompok informasi. Nilai disnapshot ke publik sehingga pembaruan admin dapat langsung dirender melalui WebSocket. Konfigurasi/state lama tanpa `overlay` mendapat default saat dibaca. Template hanya mengganti penanda yang dikenal dengan teks; tidak menjalankan HTML, JavaScript, atau CSS bebas. Konfigurasi overlay tidak memodifikasi antrean, peluang/outcome, skor, atau sisa like.
+
 Aset default dibuat dengan Three.js: diorama, gawang, net, turf, tulang/joint karakter, label dan crest inisial, efek pooled, dan audio sintetis. Tidak menggunakan logo atau model pemain profesional. GLB dari R2 dapat menggantikan model default; fallback tetap tersedia jika asset gagal dimuat. Gunakan aset mandiri dengan lisensi jelas dan orientasi +Z model menghadap kamera sebelum koreksi rotasi import. Animasi bawaan bersifat prosedural dan perlu review artistik; ini bukan klaim aset karakter fotorealistis final.
 
 Low membatasi pixel ratio dan partikel serta mematikan shadow. Medium memakai shadow dan pixel ratio maksimal 1.5. High menambah partikel dan pixel ratio maksimal 2. Kamera skill menjaga semua slot tetap terlihat. Audio hanya dibuat setelah operator menekan tombol suara.

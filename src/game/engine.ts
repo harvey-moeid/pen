@@ -13,9 +13,11 @@ import {
   type Skill,
   type Viewer,
 } from './model';
+import { defaultOverlaySettings } from './overlay';
 export function restoreState(serialized: string): RoomState {
   const state: RoomState = JSON.parse(serialized);
   state.config.likes ??= defaultLikeSettings();
+  state.config.overlay ??= defaultOverlaySettings();
   return state;
 }
 export function initialState(now = Date.now(), config = defaultConfig()): RoomState {
@@ -418,6 +420,7 @@ export function publicSnapshot(s: RoomState, now: number) {
     clubs: s.config.clubs.filter((c) => c.enabled).sort((a, b) => a.sortOrder - b.sortOrder),
     skills: s.config.skills,
     likes: s.config.likes,
+    overlay: s.config.overlay,
     giftLegend: s.config.skills
       .filter((skill) => skill.enabled)
       .map((skill) => ({

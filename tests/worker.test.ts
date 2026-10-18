@@ -455,4 +455,46 @@ describe.sequential('real Workers runtime + SQLite Durable Object + KV + R2', ()
       ).json(),
     ).toMatchObject({ status: 'queued', actions: 2, remainingLikes: 50 });
   }, 20000);
+  it('persists overlay text and visibility through KV and runtime restart while rejecting invalid styles', async () => {
+    const d = await admin();
+    d.config.overlay.text.title = {
+      text: 'LIGA <img src=x>',
+      visible: true,
+      color: '#ff8800',
+      sizePercent: 150,
+    };
+    d.config.overlay.text.clubPrompt.visible = false;
+    d.config.overlay.showGiftLegend = false;
+    expect(
+      (
+        await request(
+          '/api/admin/config',
+          'PUT',
+          { version: d.configVersion, config: d.config },
+          true,
+        )
+      ).status,
+    ).toBe(200);
+    const kv = await mf.getKVNamespace('CONFIG');
+    const saved = (await kv.get('penalty:settings', 'json')) as { config: Config };
+    expect(saved.config.overlay).toEqual(d.config.overlay);
+    await mf.dispose();
+    mf = create();
+    await mf.ready;
+    const recovered = await admin();
+    expect(recovered.config.overlay).toEqual(d.config.overlay);
+    expect(recovered.snapshot.overlay).toEqual(d.config.overlay);
+    recovered.config.overlay.text.title.color = 'url(https://example.com)';
+    expect(
+      (
+        await request(
+          '/api/admin/config',
+          'PUT',
+          { version: recovered.configVersion, config: recovered.config },
+          true,
+        )
+      ).status,
+    ).toBe(400);
+    expect((await admin()).configVersion).toBe(recovered.configVersion);
+  });
 });

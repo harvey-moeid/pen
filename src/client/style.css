@@ -1122,6 +1122,40 @@ h1 {
   display: flex;
   flex-direction: column;
 }
+.overlay-text-value {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.live-header .brand {
+  min-width: 0;
+  max-width: 75%;
+}
+.live-header .brand > div:last-child {
+  min-width: 0;
+}
+.overlay-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: 18px;
+  margin: 18px 0;
+}
+.overlay-text-preview {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #334652;
+  border-radius: 8px;
+  background: #0c151d;
+  padding: 24px;
+  font-size: 24px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.overlay-editor-grid textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 100px;
+}
 .live-header {
   display: flex;
   align-items: center;
@@ -1293,7 +1327,8 @@ h1 {
   color: #a3b4be;
 }
 .field input,
-.field select {
+.field select,
+.field textarea {
   min-height: 42px;
   min-width: 0;
   width: 100%;

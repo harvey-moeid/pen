@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Volume2,
   VolumeX,
@@ -15,6 +15,8 @@ import {
 import { Arena } from './arena';
 import { StadiumAudio } from './audio';
 import type { Snapshot } from '../game/engine';
+import { defaultOverlaySettings } from '../game/overlay';
+import { OverlayText, overlayVariables } from './overlay';
 export const skillIcons = [Target, Flame, Zap, Ghost, Sparkles];
 export const skillColors = ['#b7c2cd', '#ff9353', '#66ccff', '#c29aff', '#f5d27a'];
 export function Crest({
@@ -97,6 +99,10 @@ export function ArenaView({ snapshot, offset = 0 }: { snapshot: Snapshot; offset
   const skillIndex = k
     ? ['NORMAL', 'SKILL_1', 'SKILL_2', 'SKILL_3', 'ULTIMATE'].indexOf(k.skill.id)
     : 0;
+  const overlay = snapshot.overlay ?? defaultOverlaySettings();
+  const variables = overlayVariables(snapshot, {
+    kick: p > 0.65 && p < 0.83 ? (k?.outcome ?? '') : (k?.skill.label ?? ''),
+  });
   return (
     <div className="arena-wrap">
       <div
@@ -106,24 +112,25 @@ export function ArenaView({ snapshot, offset = 0 }: { snapshot: Snapshot; offset
       />
       {error && <div className="arena-error">{error}</div>}
       <div className="arena-topline">
-        <span className="arena-tag">
-          <span className="dot" /> DIORAMA ARENA
-        </span>
-        <span>
-          CAM 01 <span className="subtle">/</span> {snapshot.visual.quality.toUpperCase()}
-        </span>
+        <OverlayText
+          settings={overlay}
+          name="arenaTitle"
+          variables={variables}
+          className="arena-tag"
+        />
+        <OverlayText settings={overlay} name="camera" variables={variables} />
       </div>
       {k && (
         <div
           className={'kick-announcement ' + (p > 0.65 && p < 0.83 ? 'result' : '')}
           style={{ '--skill': skillColors[skillIndex] } as React.CSSProperties}
         >
-          <span>
-            {k.demo
-              ? 'DEMO · TANPA SKOR'
-              : `${k.source === 'LIKE' ? 'LIKE · ' : ''}${k.supporterName}`}
-          </span>
-          <strong>{p > 0.65 && p < 0.83 ? k.outcome : k.skill.label}</strong>
+          <OverlayText
+            settings={overlay}
+            name={k.demo ? 'demo' : 'supporter'}
+            variables={variables}
+          />
+          <OverlayText settings={overlay} name="kick" variables={variables} as="strong" />
         </div>
       )}
       {snapshot.status === 'COUNTDOWN' && (
@@ -134,21 +141,17 @@ export function ArenaView({ snapshot, offset = 0 }: { snapshot: Snapshot; offset
       {(snapshot.status === 'RESULT' || snapshot.status === 'INTERMISSION') && snapshot.result && (
         <div className="winner">
           <Trophy size={30} />
-          <small>RONDE SELESAI</small>
-          <strong>
-            {snapshot.result.winners.length > 1
-              ? 'HASIL SERI'
-              : snapshot.result.clubs.find((c) => c.id === snapshot.result!.winners[0])
-                  ?.displayName}
-          </strong>
-          <span>Antrean ronde telah diselesaikan</span>
+          <OverlayText settings={overlay} name="resultHeading" variables={variables} as="small" />
+          <OverlayText settings={overlay} name="resultWinner" variables={variables} as="strong" />
+          <OverlayText settings={overlay} name="resultNote" variables={variables} />
         </div>
       )}
       <div className="arena-bottomline">
-        <span>
-          <span className="dot lime" />{' '}
-          {snapshot.active ? 'PENALTI BERLANGSUNG' : 'MENUNGGU GILIRAN'}
-        </span>
+        <OverlayText
+          settings={overlay}
+          name={snapshot.active ? 'activeState' : 'idleState'}
+          variables={variables}
+        />
         <div>
           <button
             className="icon-button"
@@ -180,6 +183,8 @@ export function Scoreboard({
   snapshot: Snapshot;
   compact?: boolean;
 }) {
+  const overlay = snapshot.overlay ?? defaultOverlaySettings();
+  const variables = overlayVariables(snapshot);
   const metric = { GOALS: 'goals', SKILL_POINTS: 'skillPoints', GIFT_POINTS: 'giftPoints' }[
     snapshot.ranking
   ] as 'goals' | 'skillPoints' | 'giftPoints';
@@ -189,7 +194,7 @@ export function Scoreboard({
   return (
     <div className={'scoreboard ' + (compact ? 'compact' : '')}>
       <div className="section-title">
-        <h3>Klasemen klub</h3>
+        <OverlayText settings={overlay} name="scoreTitle" variables={variables} as="h3" />
         <span className="mini-label">
           {snapshot.ranking === 'GOALS'
             ? 'GOL'
@@ -224,7 +229,13 @@ export function Scoreboard({
           </div>
         ))}
       </div>
-      <div className="score-note">Satu gol. Satu langkah menuju puncak.</div>
+      <OverlayText
+        settings={overlay}
+        name="scoreNote"
+        variables={variables}
+        as="div"
+        className="score-note"
+      />
     </div>
   );
 }
@@ -244,17 +255,16 @@ export function RoundTimer({ snapshot, offset = 0 }: { snapshot: Snapshot; offse
         : snapshot.mode === 'TARGET_GOALS'
           ? `TARGET ${snapshot.targetGoals}`
           : '∞'}
-      <small>
-        {snapshot.pausedAt
-          ? 'DIJEDA'
-          : snapshot.status === 'LIVE'
-            ? 'RONDE BERJALAN'
-            : snapshot.status}
-      </small>
+      <OverlayText
+        settings={snapshot.overlay ?? defaultOverlaySettings()}
+        name="roundStatus"
+        variables={overlayVariables(snapshot)}
+        as="small"
+      />
     </span>
   );
 }
-export function Connection({ connected, label }: { connected: boolean; label: string }) {
+export function Connection({ connected, label }: { connected: boolean; label: ReactNode }) {
   return (
     <span className={'connection ' + (connected ? 'online' : '')}>
       {connected ? <Wifi size={13} /> : <WifiOff size={13} />} {label}

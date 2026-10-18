@@ -22,6 +22,8 @@ Status ini memisahkan implementasi yang dapat diuji lokal dari acceptance pada l
 | Reconnect/recovery                                                  | Snapshot melalui WebSocket, exponential backoff, server alarm, tes runtime teardown/restart                                |
 | Observability                                                       | Dashboard last event/delay, accepted/rejected/duplicate, queue/outbox, structured logs                                     |
 
+Pengaturan teks overlay mencakup 24 bagian, warna, ukuran, visibilitas, reset, dan pratinjau admin. Unit/runtime/browser tests memeriksa default state lama, persistensi KV/restart, penggantian penanda, escaping HTML, pembaruan tanpa reload, tampilan mobile, dan pemulihan tanpa mengubah game.
+
 ## Batas acceptance yang belum boleh ditandai selesai
 
 - **Delivery LIVE asli**: membutuhkan deploy, konektor aktif, payload aktual, akun uji, dan verifikasi bahwa upstream tidak memberi identitas baru pada gift yang sama. Kontrak source-code sudah diaudit; itu tidak menggantikan uji lapangan.
