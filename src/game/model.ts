@@ -87,7 +87,7 @@ export const ConfigSchema = z
       keeperColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     }),
     clubSwitchCooldownMs: z.number().int().min(0).max(3600000),
-    sourceRoomId: z.string().max(100),
+    sourceRoomId: z.string().trim().max(100),
     retentionDays: z.number().int().min(1).max(30),
   })
   .superRefine((c, ctx) => {

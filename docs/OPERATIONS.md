@@ -73,7 +73,7 @@ Jika smoke test gagal setelah upload, kode baru mungkin sudah aktif. Workflow me
 | Gejala                | Tindakan                                                                                               |
 | --------------------- | ------------------------------------------------------------------------------------------------------ |
 | 401 webhook           | Cocokkan signing secret, timestamp detik, raw body; jangan memodifikasi JSON sebelum verifikasi        |
-| source_room_mismatch  | Samakan room aktual dan sourceRoomId admin; room kosong memang ditolak                                 |
+| source_room_mismatch  | Kosongkan filter Room ID atau samakan dengan ID siaran TikTok aktual; bukan hash commit                |
 | streak_pending        | Normal untuk update combo non-final; periksa final event benar-benar tiba                              |
 | queue_full / 503      | Pantau retry konektor; jangan mengasumsikan retry terbatas menyimpan event selamanya                   |
 | Overlay putus         | Reconnect otomatis dengan exponential backoff + jitter; reload mengambil snapshot, bukan replay skor   |

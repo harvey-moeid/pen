@@ -62,19 +62,22 @@ async function admin() {
     archivePending: number;
     history: unknown[];
     kicks: { id: string; state: string; outcome: string; skill: { goalChancePercent: number } }[];
+    audit: { at: number; action: string; detail: string }[];
+    stats: { rejected: number };
   };
 }
 async function hook(
   event: string,
   data: Record<string, unknown>,
   id: string = crypto.randomUUID(),
+  roomId: string | null = '123',
 ) {
   const body = JSON.stringify({
       id,
       version: 1,
       event,
       timestamp: new Date().toISOString(),
-      roomId: '123',
+      roomId,
       data,
     }),
     timestamp = String(Math.floor(Date.now() / 1000));
@@ -161,6 +164,15 @@ describe.sequential('real Workers runtime + SQLite Durable Object + KV + R2', ()
       ).status,
     ).toBe(401);
   });
+  it('accepts signed lifecycle events without a room filter, including an unresolved room ID', async () => {
+    expect((await admin()).config.sourceRoomId).toBe('');
+    const before = (await admin()).snapshot.scores;
+    const response = await hook('stream', { state: 'started' }, 'optional-room', null);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'connected' });
+    expect((await admin()).snapshot.scores).toEqual(before);
+    expect((await admin()).snapshot.connector.status).toBe('CONNECTED');
+  });
   it('persists versioned config to KV and rejects stale admin overwrites', async () => {
     const d = await admin();
     d.config.sourceRoomId = '123';
@@ -187,6 +199,20 @@ describe.sequential('real Workers runtime + SQLite Durable Object + KV + R2', ()
     const kv = await mf.getKVNamespace('CONFIG');
     const config = (await kv.get('penalty:settings', 'json')) as { config: Config };
     expect(config.config.sourceRoomId).toBe('123');
+  });
+  it('records signed room rejection without changing scores or treating it as a connection', async () => {
+    const before = await admin();
+    const response = await hook('stream', { state: 'started' }, 'wrong-room', '999');
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'source_room_mismatch' });
+    const after = await admin();
+    expect(after.snapshot.scores).toEqual(before.snapshot.scores);
+    expect(after.snapshot.connector).toEqual(before.snapshot.connector);
+    expect(after.stats.rejected).toBe(before.stats.rejected + 1);
+    expect(after.audit[0]).toMatchObject({
+      action: 'webhook_rejected',
+      detail: 'source_room_mismatch',
+    });
   });
   it('accepts actual signed lifecycle and comments and rejects no-club gift once', async () => {
     await request('/api/admin/control', 'POST', { action: 'start' }, true);

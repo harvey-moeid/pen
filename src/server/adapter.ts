@@ -26,7 +26,9 @@ const Gift = Who.extend({
 });
 export function normalizeConnector(input: unknown, expectedRoom: string, now: number): GameEvent {
   const e = Envelope.parse(input);
-  if (!expectedRoom || String(e.roomId) !== expectedRoom) throw Error('source_room_mismatch');
+  const roomFilter = expectedRoom.trim();
+  if (roomFilter && (e.roomId === null || String(e.roomId) !== roomFilter))
+    throw Error('source_room_mismatch');
   const at = Date.parse(e.timestamp);
   if (now - at > 86400000 || at - now > 300000) throw Error('event_expired');
   if (e.data.truncated) throw Error('truncated_payload');

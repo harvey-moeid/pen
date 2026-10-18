@@ -4,7 +4,7 @@
 
 `/` menjalankan engine simulasi di browser, dengan label SIMULASI LOKAL. Tidak ada endpoint public untuk mengirim gift, memaksa outcome, atau menulis skor. `/live` membaca snapshot dan menerima WebSocket; pesan selain heartbeat menutup socket. `/api/admin/*` memeriksa sesi server, origin untuk mutasi, dan validasi schema. Webhook menggunakan HMAC yang kompatibel dengan kode konektor yang diaudit.
 
-Satu room authoritative bernama `primary` mengonsumsi tepat satu `sourceRoomId` yang dipilih admin. Ini sengaja bukan layanan multi-tenant atau multi-room publik. Room sumber kosong menolak seluruh webhook. Payload dari room lain ditolak sebelum diproses.
+Satu room authoritative bernama `primary` mengonsumsi event dari konektor yang memiliki signing secret khusus. Filter `sourceRoomId` bersifat opsional: kosong berarti menerima room apa pun dari konektor terautentikasi; jika diisi, payload dengan room lain atau room null ditolak. HMAC tetap wajib pada kedua mode. Jangan berbagi signing secret dengan sumber lain yang tidak ingin digabungkan ke pertandingan yang sama. Ini bukan layanan multi-tenant atau multi-room publik.
 
 ## Transaksi dan recovery
 

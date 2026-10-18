@@ -1,6 +1,14 @@
 import { DurableObject } from 'cloudflare:workers';
-import { ConfigSchema, type RoomState, type Receipt } from '../game/model';
-import { initialState, tick, ingest, publicSnapshot, configure, control } from '../game/engine';
+import { ConfigSchema, type RoomState, type Receipt, type GameEvent } from '../game/model';
+import {
+  initialState,
+  tick,
+  ingest,
+  publicSnapshot,
+  configure,
+  control,
+  audit,
+} from '../game/engine';
 import { normalizeConnector } from './adapter';
 export class MatchRoom extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -117,10 +125,26 @@ export class MatchRoom extends DurableObject<Env> {
   async receive(payload: unknown): Promise<Receipt> {
     const now = Date.now();
     let receipt: Receipt = { status: 'invalid' };
+    let rejection: unknown;
     this.ctx.storage.transactionSync(() => {
       const s = this.read();
+      let event: GameEvent;
+      try {
+        event = normalizeConnector(payload, s.config.sourceRoomId, now);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : '';
+        const detail = ['source_room_mismatch', 'event_expired', 'truncated_payload'].includes(
+          reason,
+        )
+          ? reason
+          : 'validation_failed';
+        s.stats.rejected++;
+        audit(s, now, 'webhook_rejected', detail);
+        this.save(s);
+        rejection = error;
+        return;
+      }
       this.transition(s, now);
-      const event = normalizeConnector(payload, s.config.sourceRoomId, now);
       const existing = this.ctx.storage.sql
         .exec<{ json: string }>('SELECT json FROM receipts WHERE id=?', event.id)
         .toArray()[0];
@@ -140,6 +164,7 @@ export class MatchRoom extends DurableObject<Env> {
       this.transition(s, now);
       this.save(s);
     });
+    if (rejection) throw rejection;
     const s = this.read();
     await this.schedule(s);
     this.broadcast(s);

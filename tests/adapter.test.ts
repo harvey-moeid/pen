@@ -55,10 +55,21 @@ describe('audited connector contract', () => {
       'disconnected',
     );
   });
-  it.each(['', 'other'])('rejects unconfigured or wrong source room %s', (room) => {
-    expect(() => normalizeConnector(envelope('gift', gift), room, now)).toThrow(
+  it.each(['', '   '])('allows an optional blank room filter %j', (room) => {
+    expect(normalizeConnector(envelope('gift', gift), room, now).type).toBe('gift');
+    expect(
+      normalizeConnector({ ...envelope('stream', { state: 'started' }), roomId: null }, room, now)
+        .type,
+    ).toBe('connected');
+  });
+  it('enforces an explicitly configured room, including null room IDs', () => {
+    expect(() => normalizeConnector(envelope('gift', gift), 'other', now)).toThrow(
       'source_room_mismatch',
     );
+    expect(() =>
+      normalizeConnector({ ...envelope('gift', gift), roomId: null }, '123', now),
+    ).toThrow('source_room_mismatch');
+    expect(normalizeConnector(envelope('gift', gift), ' 123 ', now).type).toBe('gift');
   });
   it('rejects missing username, truncated gift, missing ID and malformed count', () => {
     for (const data of [

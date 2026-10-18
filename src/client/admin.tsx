@@ -389,7 +389,7 @@ export function Admin() {
                 Samakan WEBHOOK_SIGNING_SECRET melalui secret Worker dan konektor.
               </p>
               <Field
-                label="Room ID sumber TikTok (wajib agar webhook diterima)"
+                label="Filter Room ID TikTok (opsional)"
                 type="text"
                 value={draft.sourceRoomId}
                 onChange={(v) =>
@@ -398,10 +398,16 @@ export function Admin() {
                   })
                 }
               />
+              <p>
+                Kosongkan untuk menerima event dari konektor dengan signing secret yang sama. Isi
+                hanya jika ingin membatasi satu room TikTok. Room ID adalah ID siaran pada konektor,
+                bukan username, URL, atau versi kode; nilainya dapat berubah saat LIVE baru. Gunakan
+                signing secret khusus untuk konektor sumber game ini.
+              </p>
               <div className="notice">
-                Kontrak kode diaudit: {integration?.contract}. Dedup menjamin retry dengan event.id
-                yang sama. Konektor belum meneruskan ID pesan TikTok asli; replay upstream dengan ID
-                baru perlu verifikasi sebelum produksi.
+                Versi kode konektor yang diaudit (bukan Room ID): {integration?.contract}. Dedup
+                menjamin retry dengan event.id yang sama. Konektor belum meneruskan ID pesan TikTok
+                asli; replay upstream dengan ID baru perlu verifikasi sebelum produksi.
               </div>
               <p>
                 Combo streakable dihitung hanya saat repeatEnd=true. Gift tanpa klub ditolak sebagai
@@ -428,6 +434,18 @@ export function Admin() {
                   : 'Belum ada event'}
               </p>
               <p>Delay sumber → backend: {snapshot?.connector.delayMs ?? 0} ms</p>
+              <p>
+                Penolakan webhook terakhir:{' '}
+                <b>
+                  {data?.audit.find((entry) => entry.action === 'webhook_rejected')?.detail ??
+                    'Belum ada penolakan tercatat'}
+                </b>
+              </p>
+              <p>
+                source_room_mismatch berarti filter Room ID tidak cocok; kosongkan filter atau isi
+                ID siaran yang benar, lalu simpan. Status di halaman ini diperbarui setelah event
+                diterima, bukan saat URL webhook baru ditambahkan.
+              </p>
               <p>Event yang lolos signature tetapi ditolak dapat dilihat di Riwayat → Audit.</p>
               <a className="button" href="/" target="_blank" rel="noreferrer">
                 Buka simulator lokal <ExternalLink size={14} />

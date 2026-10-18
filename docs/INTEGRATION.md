@@ -8,7 +8,7 @@ Sumber yang diperiksa: `server/events.js`, `server/gifts.js`, `server/tiktok.js`
 
 Gunakan fitur **Integrasi Webhook** yang sudah ada, bukan membuat koneksi TikTok tambahan. URL receiver game: `https://<domain-game>/api/hooks/tiktok`. Pilih event `chat`, `gift`, `stream`.
 
-Header `x-tlk-signature: sha256=<hex HMAC-SHA256>` ditandatangani atas `x-tlk-timestamp + "." + rawBody`. Timestamp berupa Unix detik. Receiver memverifikasi raw body, timestamp maksimal ±300 detik, signature, schema, room sumber, dan ID. Metadata header event ID tidak dipercaya; ID dalam body yang sudah diverifikasi digunakan.
+Header `x-tlk-signature: sha256=<hex HMAC-SHA256>` ditandatangani atas `x-tlk-timestamp + "." + rawBody`. Timestamp berupa Unix detik. Receiver memverifikasi raw body, timestamp maksimal ±300 detik, signature, schema, filter room sumber jika diisi, dan ID. Metadata header event ID tidak dipercaya; ID dalam body yang sudah diverifikasi digunakan.
 
 ```json
 {
@@ -55,7 +55,7 @@ Chat memakai `data.username`, `data.nickname`, dan `data.message`. Lifecycle akt
 
 ## Langkah uji LIVE terkontrol
 
-1. Isi room sumber, secret yang sama di kedua backend, dan mapping Gift ID terverifikasi.
+1. Samakan secret khusus di kedua backend dan isi mapping Gift ID terverifikasi. Filter Room ID boleh kosong; isi hanya untuk membatasi ID siaran tertentu.
 2. Mulai ronde dan konektor. Periksa stream started dan `lastEventAt`.
 3. Kirim komentar klub dari akun uji, lalu satu gift dan satu combo. Cocokkan ID receipt dan jumlah tendangan dengan payload aktual.
 4. Kirim ulang body identik dengan timestamp signature baru: tidak menambah aksi.
