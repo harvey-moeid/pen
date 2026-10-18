@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   Volume2,
   VolumeX,
   Maximize,
+  Minimize,
   Flame,
   Zap,
   Ghost,
@@ -51,11 +52,27 @@ export function Crest({
     </span>
   );
 }
-export function ArenaView({ snapshot, offset = 0 }: { snapshot: Snapshot; offset?: number }) {
+export function ArenaView({
+  snapshot,
+  offset = 0,
+  overlayTarget,
+}: {
+  snapshot: Snapshot;
+  offset?: number;
+  overlayTarget?: RefObject<HTMLElement | null>;
+}) {
   const host = useRef<HTMLDivElement>(null),
     arena = useRef<Arena | null>(null);
   const [error, setError] = useState(''),
-    [muted, setMuted] = useState(true);
+    [muted, setMuted] = useState(true),
+    [fullscreenError, setFullscreenError] = useState(''),
+    [fullscreen, setFullscreen] = useState(false),
+    [fullscreenMode, setFullscreenMode] = useState<'ARENA' | 'OVERLAY' | ''>('');
+  useEffect(() => {
+    const onChange = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
   const audio = useRef<StadiumAudio | null>(null),
     mutedRef = useRef(true),
     volume = useRef(snapshot.visual.volume);
@@ -100,6 +117,24 @@ export function ArenaView({ snapshot, offset = 0 }: { snapshot: Snapshot; offset
     ? ['NORMAL', 'SKILL_1', 'SKILL_2', 'SKILL_3', 'ULTIMATE'].indexOf(k.skill.id)
     : 0;
   const overlay = snapshot.overlay ?? defaultOverlaySettings();
+  const selectedFullscreenMode = fullscreenMode || overlay.fullscreenMode || 'ARENA';
+  const toggleFullscreen = async () => {
+    setFullscreenError('');
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        const target =
+          overlayTarget && selectedFullscreenMode === 'OVERLAY'
+            ? overlayTarget.current
+            : host.current?.parentElement;
+        if (!target?.requestFullscreen) throw new Error('Fullscreen unavailable');
+        await target.requestFullscreen();
+      }
+    } catch {
+      setFullscreenError('Layar penuh tidak tersedia di browser ini.');
+    }
+  };
   const variables = overlayVariables(snapshot, {
     kick: p > 0.65 && p < 0.83 ? (k?.outcome ?? '') : (k?.skill.label ?? ''),
   });
@@ -111,6 +146,11 @@ export function ArenaView({ snapshot, offset = 0 }: { snapshot: Snapshot; offset
         aria-label="Arena 3D: seluruh penendang berjejer menghadap satu gawang"
       />
       {error && <div className="arena-error">{error}</div>}
+      {fullscreenError && (
+        <div className="fullscreen-error" role="status">
+          {fullscreenError}
+        </div>
+      )}
       <div className="arena-topline">
         <OverlayText
           settings={overlay}
@@ -153,6 +193,18 @@ export function ArenaView({ snapshot, offset = 0 }: { snapshot: Snapshot; offset
           variables={variables}
         />
         <div>
+          {overlayTarget && (
+            <select
+              className="fullscreen-mode"
+              aria-label="Mode layar penuh"
+              value={selectedFullscreenMode}
+              disabled={fullscreen}
+              onChange={(e) => setFullscreenMode(e.target.value as 'ARENA' | 'OVERLAY')}
+            >
+              <option value="OVERLAY">Semua overlay</option>
+              <option value="ARENA">Arena saja (seperti sekarang)</option>
+            </select>
+          )}
           <button
             className="icon-button"
             onClick={toggleAudio}
@@ -162,14 +214,10 @@ export function ArenaView({ snapshot, offset = 0 }: { snapshot: Snapshot; offset
           </button>
           <button
             className="icon-button"
-            onClick={() =>
-              void host.current?.parentElement
-                ?.requestFullscreen()
-                .catch(() => setError('Fullscreen tidak tersedia'))
-            }
-            aria-label="Layar penuh"
+            onClick={() => void toggleFullscreen()}
+            aria-label={fullscreen ? 'Keluar layar penuh' : 'Layar penuh'}
           >
-            <Maximize size={16} />
+            {fullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
           </button>
         </div>
       </div>

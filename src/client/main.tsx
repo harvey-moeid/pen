@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   ArrowUpRight,
@@ -347,6 +347,7 @@ function Studio() {
 }
 function Live() {
   const { snapshot, connection, offset } = useLive();
+  const overlayTarget = useRef<HTMLElement>(null);
   if (!snapshot)
     return (
       <div className="loading-screen">
@@ -373,6 +374,7 @@ function Live() {
   );
   return (
     <main
+      ref={overlayTarget}
       className="live-layout"
       style={{ '--safe-area': `${snapshot.visual.safeArea}%` } as React.CSSProperties}
     >
@@ -410,7 +412,7 @@ function Live() {
         ))}
       </div>
       <div className="live-arena">
-        <ArenaView snapshot={snapshot} offset={offset.current} />
+        <ArenaView snapshot={snapshot} offset={offset.current} overlayTarget={overlayTarget} />
       </div>
       <div className="live-instructions">
         <OverlayText settings={overlay} name="guide" variables={variables} className="eyebrow" />

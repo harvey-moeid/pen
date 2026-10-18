@@ -215,8 +215,81 @@ try {
   await expect(sampleLive.locator('.arena-error')).toHaveCount(0);
   await expect(sampleLive.locator('.arena-canvas')).not.toHaveAttribute('data-asset-warning', /.+/);
   await sampleLive.screenshot({ path: join(out, 'example-assets-uploaded.png'), fullPage: true });
+  await page.goto(base + '/admin/overlay');
+  await page.getByLabel('Di atas kepala pemain').selectOption('LOGO');
+  await page.getByLabel('Mode layar penuh bawaan').selectOption('OVERLAY');
+  await page.getByRole('button', { name: 'Simpan perubahan' }).click();
+  await expect(page.getByRole('status')).toContainText('tersimpan');
+  await expect(sampleLive.locator('.player-label img')).toHaveCount(1);
+  await sampleLive.locator('.player-label img').evaluate((img) => img.decode());
+  await expect(sampleLive.locator('.player-label:not(.player-label-logo)').first()).toHaveText(
+    'BAR',
+  );
+  await expect(sampleLive.getByLabel('Mode layar penuh')).toHaveValue('OVERLAY');
+  await page.reload();
+  await expect(page.getByLabel('Di atas kepala pemain')).toHaveValue('LOGO');
+  await expect(page.getByLabel('Mode layar penuh bawaan')).toHaveValue('OVERLAY');
+  await sampleLive.screenshot({ path: join(out, 'player-logo-mobile.png'), fullPage: true });
+  // A failed logo returns to the club code rather than leaving an empty badge.
+  await sampleLive.locator('.player-label img').evaluate((img) => {
+    img.dispatchEvent(new Event('error'));
+  });
+  await expect(sampleLive.locator('.player-label').first()).toHaveText('RMA');
+  await page.getByLabel('Di atas kepala pemain').selectOption('TEXT');
+  await page.getByRole('button', { name: 'Simpan perubahan' }).click();
+  await expect(page.getByRole('status')).toContainText('tersimpan');
+  await expect(sampleLive.locator('.player-label img')).toHaveCount(0);
+  await expect(sampleLive.locator('.player-label').first()).toHaveText('RMA');
+  // Both native fullscreen targets resize correctly, including exit and re-entry.
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await sampleLive.setViewportSize(viewport);
+    for (const [mode, target] of [
+      ['OVERLAY', 'live-layout'],
+      ['ARENA', 'arena-wrap'],
+    ]) {
+      await sampleLive.getByLabel('Mode layar penuh').selectOption(mode);
+      await sampleLive.getByRole('button', { name: 'Layar penuh', exact: true }).click();
+      await expect
+        .poll(() => sampleLive.evaluate(() => document.fullscreenElement?.className))
+        .toBe(target);
+      await expect(sampleLive.getByLabel('Mode layar penuh')).toBeDisabled();
+      const sizing = await sampleLive.evaluate(() => {
+        const el = document.fullscreenElement;
+        const canvas = el.querySelector('canvas');
+        return {
+          width: el.getBoundingClientRect().width,
+          height: el.getBoundingClientRect().height,
+          vw: innerWidth,
+          vh: innerHeight,
+          canvasWidth: canvas.getBoundingClientRect().width,
+        };
+      });
+      assert.ok(Math.abs(sizing.width - sizing.vw) < 2);
+      assert.ok(Math.abs(sizing.height - sizing.vh) < 2);
+      assert.ok(sizing.canvasWidth > 0);
+      if (mode === 'OVERLAY') {
+        await expect(sampleLive.locator('.live-scores')).toBeVisible();
+        await expect(sampleLive.locator('.live-header')).toBeVisible();
+        await sampleLive.screenshot({
+          path: join(out, `fullscreen-overlay-${viewport.width}.png`),
+        });
+      }
+      await sampleLive.getByRole('button', { name: 'Keluar layar penuh' }).click();
+      await expect
+        .poll(() => sampleLive.evaluate(() => document.fullscreenElement === null))
+        .toBe(true);
+      await expect(sampleLive.getByLabel('Mode layar penuh')).toBeEnabled();
+    }
+  }
+  checks.push(
+    'Player logo/text saves and updates live with missing/broken-logo fallback; both fullscreen targets enter, resize and exit on desktop/mobile',
+  );
   const restoreSamples = await (await context.request.get(base + '/api/admin/state')).json();
   restoreSamples.config.clubs = beforeSamples.config.clubs;
+  restoreSamples.config.overlay = beforeSamples.config.overlay;
   assert.equal(
     (
       await context.request.put(base + '/api/admin/config', {

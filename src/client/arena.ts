@@ -164,6 +164,7 @@ export class Arena {
   private trailPositions = new Float32Array(240 * 3);
   private positions: T.Vector3[] = [];
   private key = '';
+  private labelMode = '';
   private lastKick = '';
   private onResult?: (result: string) => void;
   private disposed = false;
@@ -430,6 +431,7 @@ export class Arena {
       this.scene.add(this.keeper.root);
     }
     const newKey = JSON.stringify(snapshot.clubs);
+    const labelsChanged = newKey !== this.key;
     if (newKey !== this.key) {
       this.key = newKey;
       for (const p of this.players) {
@@ -447,7 +449,6 @@ export class Arena {
         this.scene.add(p.root);
         const label = document.createElement('div');
         label.className = 'player-label';
-        label.textContent = club.code;
         label.style.setProperty('--club', club.primaryColor);
         this.host.appendChild(label);
         const person: Person = { ...p, home, club, label };
@@ -479,6 +480,34 @@ export class Arena {
           );
         }
       });
+    }
+    const labelMode = snapshot.overlay?.playerLabelMode ?? 'TEXT';
+    if (labelsChanged || labelMode !== this.labelMode) {
+      this.labelMode = labelMode;
+      for (const { label, club } of this.players) {
+        label.replaceChildren();
+        label.classList.remove('player-label-logo');
+        label.setAttribute('aria-label', club.displayName);
+        label.title = club.displayName;
+        if (labelMode === 'LOGO' && club.logoAssetKey) {
+          const logo = document.createElement('img');
+          logo.alt = club.code;
+          logo.src = '/media/' + club.logoAssetKey;
+          logo.addEventListener(
+            'error',
+            () => {
+              if (logo.parentElement !== label) return;
+              label.classList.remove('player-label-logo');
+              label.textContent = club.code;
+            },
+            { once: true },
+          );
+          label.classList.add('player-label-logo');
+          label.appendChild(logo);
+        } else {
+          label.textContent = club.code;
+        }
+      }
     }
     if (this.quality !== snapshot.visual.quality) {
       this.quality = snapshot.visual.quality;

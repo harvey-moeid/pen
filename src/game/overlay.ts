@@ -184,6 +184,8 @@ export const OverlayTextSchema = z.object({
 });
 export const OverlaySchema = z.object({
   text: z.record(z.enum(overlayTextKeys), OverlayTextSchema),
+  playerLabelMode: z.enum(['TEXT', 'LOGO']).default('TEXT'),
+  fullscreenMode: z.enum(['ARENA', 'OVERLAY']).default('ARENA'),
   showClubCodes: z.boolean(),
   showGiftLegend: z.boolean(),
   showConnections: z.boolean(),
@@ -205,6 +207,8 @@ export function defaultOverlaySettings(): OverlaySettings {
   ) as OverlaySettings['text'];
   return {
     text,
+    playerLabelMode: 'TEXT',
+    fullscreenMode: 'ARENA',
     showClubCodes: true,
     showGiftLegend: true,
     showConnections: true,

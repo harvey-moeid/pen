@@ -18,6 +18,8 @@ export function restoreState(serialized: string): RoomState {
   const state: RoomState = JSON.parse(serialized);
   state.config.likes ??= defaultLikeSettings();
   state.config.overlay ??= defaultOverlaySettings();
+  state.config.overlay.playerLabelMode ??= 'TEXT';
+  state.config.overlay.fullscreenMode ??= 'ARENA';
   return state;
 }
 export function initialState(now = Date.now(), config = defaultConfig()): RoomState {

@@ -59,6 +59,10 @@ Contoh siap unggah tersedia di **Admin → Klub → Contoh aset siap unggah**: [
 
 ## Teks overlay
 
+Di **Admin → Teks overlay → Penanda pemain & layar penuh**, pilih **Tulisan (kode klub)** atau **Logo klub** untuk penanda di atas kepala pemain. Logo memakai gambar dari menu Klub; klub tanpa logo atau dengan gambar gagal dimuat tetap menampilkan kode klub. Perubahan diterapkan ke overlay LIVE setelah disimpan.
+
+Tombol layar penuh pada `/live` memiliki dua pilihan: **Semua overlay** (arena, skor, timer, dan petunjuk) atau **Arena saja (seperti sekarang)**. Pilih mode di sebelah ikon, lalu klik ikon untuk masuk; tekan Esc atau klik ikon lagi untuk keluar. Mode bawaan dapat disimpan di admin. Konfigurasi lama tetap memakai tulisan dan layar penuh arena saja.
+
 Di **Admin → Teks overlay**, pilih satu dari 24 bagian tulisan: judul/subjudul, petunjuk, label arena, nama pendukung/skill saat tendangan, hasil ronde, klasemen, antrean, dan status. Isi maksimal 240 karakter per bagian, warna HEX, ukuran relatif 50–200%, serta sakelar tampil/sembunyikan. Isi kosong juga menyembunyikan bagian tersebut.
 
 Pratinjau mengikuti draft; **Simpan perubahan** menerapkan teks ke overlay tersambung melalui WebSocket tanpa reload. **Pulihkan bagian ini** dan **Pulihkan semua teks dan tampilan** menyiapkan nilai bawaan sebagai draft sampai disimpan. Daftar kode klub, daftar gift/skill, koneksi, klasemen detail landscape, dan pemberitahuan dapat disembunyikan per kelompok. Nama klub/skill/gift tetap diatur di menu masing-masing.

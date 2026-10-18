@@ -40,6 +40,28 @@ describe('editable overlay text', () => {
       }),
     ).toBe('<b>{queue}</b> {unknown} {constructor}');
   });
+  it('loads saved overlays from before player labels and fullscreen options existed', () => {
+    const legacy = JSON.parse(JSON.stringify(initialState(1000)));
+    delete legacy.config.overlay.playerLabelMode;
+    delete legacy.config.overlay.fullscreenMode;
+    const recovered = restoreState(JSON.stringify(legacy));
+    expect(recovered.config.overlay.playerLabelMode).toBe('TEXT');
+    expect(recovered.config.overlay.fullscreenMode).toBe('ARENA');
+    expect(recovered.config.overlay.text).toEqual(legacy.config.overlay.text);
+    expect(recovered.scores).toEqual(legacy.scores);
+  });
+  it('publishes logo and fullscreen preferences to connected overlays', () => {
+    const state = initialState(1000);
+    const config = structuredClone(state.config);
+    config.overlay.playerLabelMode = 'LOGO';
+    config.overlay.fullscreenMode = 'OVERLAY';
+    configure(state, ConfigSchema.parse(config), 1100);
+    expect(publicSnapshot(state, 1100).overlay).toMatchObject({
+      playerLabelMode: 'LOGO',
+      fullscreenMode: 'OVERLAY',
+    });
+    expect(state.scores).toEqual(initialState(1000).scores);
+  });
   it('escapes markup and renders the configured relative font size and color', () => {
     const settings = defaultOverlaySettings();
     settings.text.title = {

@@ -1100,6 +1100,49 @@ export function Admin() {
         {page === 'overlay' && (
           <>
             <section className="panel padded">
+              <h3>Penanda pemain & layar penuh</h3>
+              <div className="form-grid">
+                <label className="field">
+                  <span>Di atas kepala pemain</span>
+                  <select
+                    value={draft.overlay.playerLabelMode}
+                    onChange={(e) =>
+                      edit((c) => {
+                        c.overlay.playerLabelMode = e.target.value as 'TEXT' | 'LOGO';
+                      })
+                    }
+                  >
+                    <option value="TEXT">Tulisan (kode klub)</option>
+                    <option value="LOGO">Logo klub</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Mode layar penuh bawaan</span>
+                  <select
+                    value={draft.overlay.fullscreenMode}
+                    onChange={(e) =>
+                      edit((c) => {
+                        c.overlay.fullscreenMode = e.target.value as 'ARENA' | 'OVERLAY';
+                      })
+                    }
+                  >
+                    <option value="OVERLAY">Semua overlay</option>
+                    <option value="ARENA">Arena saja (seperti sekarang)</option>
+                  </select>
+                </label>
+              </div>
+              <p>
+                Logo memakai gambar yang diunggah pada halaman Klub. Jika logo belum ada atau gagal
+                dimuat, kode klub ditampilkan. Simpan perubahan untuk memperbarui penanda pemain
+                pada overlay LIVE.
+              </p>
+              <p>
+                Pada overlay LIVE, pilih cakupan layar penuh di sebelah ikon layar penuh, lalu klik
+                ikon tersebut. Semua overlay menyertakan skor, timer, dan petunjuk siaran. Tekan Esc
+                atau klik ikon lagi untuk keluar.
+              </p>
+            </section>
+            <section className="panel padded">
               <div className="section-title">
                 <h3>Tulisan untuk siaran</h3>
                 <a className="button" href="/live" target="_blank" rel="noreferrer">

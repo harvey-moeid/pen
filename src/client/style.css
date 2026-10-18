@@ -519,6 +519,44 @@ h1 {
   border-color: var(--lime);
   color: var(--lime);
 }
+.player-label.player-label-logo {
+  width: 38px;
+  height: 38px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.player-label-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.fullscreen-mode {
+  min-width: 0;
+  max-width: 140px;
+  padding: 5px;
+  font-size: 10px;
+  background: #0d1a23;
+  border: 1px solid #34454e;
+  border-radius: 5px;
+  color: #c6d0d9;
+}
+.fullscreen-mode:disabled {
+  opacity: 0.65;
+}
+.fullscreen-error {
+  position: absolute;
+  bottom: 58px;
+  left: 16px;
+  right: 16px;
+  padding: 10px;
+  background: #3b2227;
+  color: #ffb0a6;
+  z-index: 4;
+  font-size: 12px;
+}
 .kick-announcement {
   position: absolute;
   top: 15%;
@@ -2189,4 +2227,21 @@ h1 {
   font-size: 0.9em;
   margin-top: 4px;
   color: #91a89b;
+}
+
+.arena-wrap:fullscreen,
+.live-arena .arena-wrap:fullscreen {
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  max-height: none;
+  border-radius: 0;
+}
+.live-layout:fullscreen {
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  overflow: auto;
 }
