@@ -665,6 +665,29 @@ export function Admin() {
             >
               <Plus size={15} /> Tambah klub
             </button>
+            <section className="panel padded">
+              <h3>Event tanpa komentar klub</h3>
+              <Toggle
+                label="Gacha klub jika penonton belum memilih klub"
+                value={draft.randomClubWithoutComment}
+                onChange={(value) =>
+                  edit((c) => {
+                    c.randomClubWithoutComment = value;
+                  })
+                }
+              />
+              <p>
+                Jika aktif, setiap tendangan dari gift atau like penonton yang belum memilih klub
+                diundi dari klub aktif dengan peluang sama. Combo dapat menghasilkan klub berbeda
+                pada setiap tendangan. Gacha tidak menetapkan pilihan klub penonton.
+              </p>
+              <p>
+                Komentar kode klub langsung menetapkan klub untuk event berikutnya. Like tetap
+                mengikuti ambang dan sakelar pada menu Like → tendangan. Jika gacha dimatikan,
+                penonton wajib memilih klub dahulu. Perubahan mode menghapus sisa like penonton
+                gacha; tendangan yang sudah mengantre tetap berjalan.
+              </p>
+            </section>
             <Field
               label="Cooldown pindah klub (ms)"
               value={draft.clubSwitchCooldownMs}
@@ -782,15 +805,19 @@ export function Admin() {
               }
             />
             <p>
-              Dihitung per penonton untuk klub yang dipilih lewat komentar. Setiap{' '}
-              {draft.likes.likesPerKick || 'N'} like memicu 1 Normal Kick. Misalnya, ambang 100
-              dengan 250 like menghasilkan 2 tendangan dan menyimpan sisa 50 like.
+              Dihitung per penonton. Setiap {draft.likes.likesPerKick || 'N'} like memicu 1 Normal
+              Kick. Misalnya, ambang 100 dengan 250 like menghasilkan 2 tendangan dan menyimpan sisa
+              50 like.
             </p>
             <p>
-              Like hanya dihitung saat ronde LIVE, tidak dijeda, dan penonton sudah memilih klub.
-              Sisa like direset ketika pindah klub, ronde baru/reset, atau pengaturan like berubah.
-              Tendangan yang sudah mengantre tetap berjalan dengan aturan saat diterima.
+              Like hanya dihitung saat ronde LIVE dan tidak dijeda. Penonton tanpa pilihan klub
+              mengikuti pengaturan gacha pada menu Klub. Sisa like direset ketika pindah klub, ronde
+              baru/reset, atau pengaturan like berubah. Tendangan yang sudah mengantre tetap
+              berjalan dengan aturan saat diterima.
             </p>
+            <a className="button" href="/admin/clubs">
+              Atur gacha tanpa komentar
+            </a>
             <p>
               Peluang gol, poin saat gol, durasi, dan prioritas mengikuti skill NORMAL pada menu
               Skill & peluang. Tendangan like tidak menambah poin gift dan tidak memerlukan mapping

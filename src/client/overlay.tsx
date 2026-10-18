@@ -1,16 +1,30 @@
 import type { Snapshot } from '../game/engine';
-import { formatOverlayText, type OverlaySettings, type OverlayTextKey } from '../game/overlay';
+import {
+  formatOverlayText,
+  overlayTextDefinitions,
+  type OverlaySettings,
+  type OverlayTextKey,
+} from '../game/overlay';
+
+const randomClubText: Partial<Record<OverlayTextKey, string>> = {
+  guide: 'KOMENTAR KODE KLUB ATAU GACHA → {actions} → TENDANG!',
+  clubPrompt: 'Pilih klub atau biarkan gacha!',
+  giftNotice: 'Belum memilih klub? Setiap tendangan dari gift diundi dari klub aktif.',
+  likeNotice:
+    'Setiap {likes} like per penonton → 1 tendangan normal. Belum memilih klub? Klub diundi setiap tendangan!',
+};
 
 export function overlayVariables(snapshot: Snapshot, extras: Record<string, string | number> = {}) {
   const result = snapshot.result;
   return {
     actions: snapshot.likes.enabled ? 'LIKE / GIFT' : 'KIRIM GIFT',
     likes: snapshot.likes.likesPerKick,
+    randomClub: snapshot.randomClubWithoutComment ? 1 : 0,
     queue: snapshot.queueDepth,
     ranking: snapshot.ranking,
     quality: snapshot.visual.quality.toUpperCase(),
     supporter: snapshot.active?.supporterName ?? '',
-    source: snapshot.active?.source === 'LIKE' ? 'LIKE · ' : '',
+    source: `${snapshot.active?.randomClub ? 'GACHA · ' : ''}${snapshot.active?.source === 'LIKE' ? 'LIKE · ' : ''}`,
     kick: snapshot.active?.skill.label ?? '',
     winner: result
       ? result.winners.length > 1
@@ -42,10 +56,14 @@ export function OverlayText({
 }) {
   const item = settings.text[name];
   if (!item.visible || !item.text.trim()) return null;
+  const text =
+    variables.randomClub === 1 && item.text === overlayTextDefinitions[name].text
+      ? (randomClubText[name] ?? item.text)
+      : item.text;
   return (
     <Tag data-overlay-text={name} className={className} style={{ color: item.color }}>
       <span className="overlay-text-value" style={{ fontSize: `${item.sizePercent / 100}em` }}>
-        {formatOverlayText(item.text, variables)}
+        {formatOverlayText(text, variables)}
       </span>
     </Tag>
   );

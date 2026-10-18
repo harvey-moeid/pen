@@ -529,6 +529,66 @@ try {
     );
   }
   checks.push('Landscape 1280×720: all clubs stay inside arena');
+  const gachaAdmin = await context.newPage();
+  gachaAdmin.on('pageerror', (e) => errors.push(e.message));
+  await gachaAdmin.goto(base + '/admin/clubs');
+  await gachaAdmin.getByLabel('Gacha klub jika penonton belum memilih klub').check();
+  await gachaAdmin.getByRole('button', { name: 'Simpan perubahan' }).click();
+  await expect(gachaAdmin.getByRole('status')).toContainText('tersimpan');
+  await gachaAdmin.reload();
+  await expect(gachaAdmin.getByLabel('Gacha klub jika penonton belum memilih klub')).toBeChecked();
+  await expect(page.locator('[data-overlay-text="giftNotice"]')).toContainText('diundi');
+  const beforeGacha = await (await context.request.get(base + '/api/snapshot')).json();
+  const totalKicks = (snapshot) =>
+    Object.values(snapshot.scores).reduce((sum, score) => sum + score.kicks, 0);
+  const gachaGift = {
+    username: 'gacha-browser',
+    nickname: 'Gacha Tester',
+    giftId: '5655',
+    diamondCount: 1,
+    repeatCount: 1,
+    repeatEnd: true,
+    giftType: 1,
+  };
+  assert.equal(
+    (await (await hook('gift', gachaGift, 'browser-gacha-gift')).json()).status,
+    'queued',
+  );
+  await expect(page.locator('.kick-announcement')).toContainText('GACHA');
+  const drawn = await (await context.request.get(base + '/api/snapshot')).json();
+  assert.equal(drawn.active.randomClub, true);
+  assert.ok(drawn.clubs.some((club) => club.id === drawn.active.clubId));
+  assert.equal(
+    (await (await hook('gift', gachaGift, 'browser-gacha-gift')).json()).status,
+    'duplicate',
+  );
+  await expect
+    .poll(async () => totalKicks(await (await context.request.get(base + '/api/snapshot')).json()))
+    .toBe(totalKicks(beforeGacha) + 1);
+  assert.equal(
+    (
+      await (
+        await hook('like', { username: 'gacha-browser', likeCount: 100 }, 'browser-gacha-like')
+      ).json()
+    ).status,
+    'queued',
+  );
+  await expect(page.locator('.kick-announcement')).toContainText('GACHA · LIKE');
+  await expect
+    .poll(async () => totalKicks(await (await context.request.get(base + '/api/snapshot')).json()))
+    .toBe(totalKicks(beforeGacha) + 2);
+  await gachaAdmin.getByLabel('Gacha klub jika penonton belum memilih klub').uncheck();
+  await gachaAdmin.getByRole('button', { name: 'Simpan perubahan' }).click();
+  await expect(gachaAdmin.getByRole('status')).toContainText('tersimpan');
+  await expect(page.locator('[data-overlay-text="giftNotice"]')).toContainText('tidak memicu');
+  assert.equal(
+    (await (await hook('gift', gachaGift, 'browser-gacha-disabled')).json()).status,
+    'no_club',
+  );
+  await gachaAdmin.close();
+  checks.push(
+    'Gacha toggle persists; no-comment gift and threshold likes draw active clubs, label GACHA, score once on retry, and require a comment again when disabled',
+  );
   assert.deepEqual(errors, []);
   assert.deepEqual(networkErrors, []);
   const report = {

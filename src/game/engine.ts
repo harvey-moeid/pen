@@ -17,6 +17,7 @@ import { defaultOverlaySettings } from './overlay';
 export function restoreState(serialized: string): RoomState {
   const state: RoomState = JSON.parse(serialized);
   state.config.likes ??= defaultLikeSettings();
+  state.config.randomClubWithoutComment ??= false;
   state.config.overlay ??= defaultOverlaySettings();
   state.config.overlay.playerLabelMode ??= 'TEXT';
   state.config.overlay.fullscreenMode ??= 'ARENA';
@@ -78,13 +79,16 @@ function enqueue(
   contribution: number,
   now: number,
   source: 'GIFT' | 'LIKE',
+  chooseClub: () => string,
 ): Receipt {
   for (let i = 0; i < units; i++) {
+    const clubId = chooseClub();
+    if (viewer.clubSelection === 'RANDOM') viewer.clubId = clubId;
     s.queue.push({
       id: `${e.id}:${i}`,
       eventId: e.id,
       matchId: s.matchId,
-      clubId: viewer.clubId,
+      clubId,
       supporterId: 'u:' + e.userId,
       supporterName: viewer.displayName,
       skill: structuredClone(skill),
@@ -95,6 +99,7 @@ function enqueue(
       demo: false,
       configVersion: s.configVersion,
       source,
+      randomClub: viewer.clubSelection === 'RANDOM',
     });
   }
   viewer.seenAt = now;
@@ -103,7 +108,12 @@ function enqueue(
   s.stats.accepted += units;
   return { status: 'queued', actions: units };
 }
-export function ingest(s: RoomState, e: GameEvent, now: number): Receipt {
+export function ingest(
+  s: RoomState,
+  e: GameEvent,
+  now: number,
+  random: () => number = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296,
+): Receipt {
   s.connector.lastEventAt = now;
   s.connector.delayMs = Math.max(0, now - e.at);
   if (e.type === 'connected' || e.type === 'disconnected' || e.type === 'reconnecting') {
@@ -128,6 +138,7 @@ export function ingest(s: RoomState, e: GameEvent, now: number): Receipt {
     if (!club) return { status: 'ignored_comment' };
     if (
       viewer &&
+      viewer.clubSelection !== 'RANDOM' &&
       viewer.clubId !== club.id &&
       now - viewer.changedAt < s.config.clubSwitchCooldownMs
     )
@@ -136,44 +147,71 @@ export function ingest(s: RoomState, e: GameEvent, now: number): Receipt {
       return reject('viewer_capacity', 'Kapasitas penonton penuh', true);
     s.viewers[userKey] = {
       clubId: club.id,
+      clubSelection: 'COMMENT',
       displayName: (e.displayName || 'Pendukung').slice(0, 40),
-      changedAt: viewer?.clubId === club.id ? viewer.changedAt : now,
+      changedAt:
+        viewer?.clubSelection !== 'RANDOM' && viewer?.clubId === club.id ? viewer.changedAt : now,
       seenAt: now,
       score: viewer?.score ?? emptyScore(),
-      likeRemainder: viewer?.clubId === club.id ? (viewer.likeRemainder ?? 0) : 0,
+      likeRemainder:
+        viewer?.clubSelection !== 'RANDOM' && viewer?.clubId === club.id
+          ? (viewer.likeRemainder ?? 0)
+          : 0,
     };
     return { status: 'club_selected', message: club.code };
   }
+  const activeClubs = s.config.clubs.filter((c) => c.enabled);
+  const hasSelectedClub =
+    viewer && viewer.clubSelection !== 'RANDOM' && activeClubs.some((c) => c.id === viewer.clubId);
+  const canChooseClub =
+    hasSelectedClub || (s.config.randomClubWithoutComment && activeClubs.length > 0);
+  const chooseClub = () =>
+    hasSelectedClub ? viewer.clubId : activeClubs[Math.floor(random() * activeClubs.length)].id;
+  // Only create or update an unassigned viewer after the entire event can be accepted.
+  const acceptViewer = () => {
+    const accepted = viewer ?? {
+      clubId: '',
+      displayName: (e.displayName || 'Pendukung').slice(0, 40),
+      changedAt: now,
+      seenAt: now,
+      score: emptyScore(),
+      likeRemainder: 0,
+    };
+    if (!hasSelectedClub) accepted.clubSelection = 'RANDOM';
+    s.viewers[userKey] = accepted;
+    return accepted;
+  };
   if (e.type === 'like') {
     if (!s.config.likes.enabled) return { status: 'likes_disabled' };
     const count = e.likeCount;
     if (count === undefined || !Number.isInteger(count) || count < 1 || count > 1000000)
       return reject('invalid_like_count', 'Jumlah like tidak valid');
-    if (!viewer || !s.config.clubs.some((c) => c.id === viewer.clubId && c.enabled))
-      return reject('no_club', 'Pilih klub dulu!');
+    if (!canChooseClub) return reject('no_club', 'Pilih klub dulu!');
     if (s.status !== 'LIVE' || s.pausedAt !== null)
       return reject('round_closed', 'Ronde tidak menerima like');
     const skill = s.config.skills.find((k) => k.id === 'NORMAL' && k.enabled);
     if (!skill) return reject('normal_disabled', 'Aktifkan skill Normal Kick untuk tendangan like');
-    const total = (viewer.likeRemainder ?? 0) + count;
+    const total = (viewer?.likeRemainder ?? 0) + count;
     const units = Math.floor(total / s.config.likes.likesPerKick);
     if (s.queue.length + units > s.config.queue.capacity)
       return reject('queue_full', 'Antrean penuh; event perlu dikirim ulang', true);
-    viewer.likeRemainder = total % s.config.likes.likesPerKick;
-    viewer.seenAt = now;
+    if (!viewer && Object.keys(s.viewers).length >= 10000)
+      return reject('viewer_capacity', 'Kapasitas penonton penuh', true);
+    const accepted = acceptViewer();
+    accepted.likeRemainder = total % s.config.likes.likesPerKick;
+    accepted.seenAt = now;
     s.lastActivity = now;
     s.nextDemoAt = now + s.config.idle.timeoutMs;
     if (!units)
-      return { status: 'likes_accumulated', actions: 0, remainingLikes: viewer.likeRemainder };
+      return { status: 'likes_accumulated', actions: 0, remainingLikes: accepted.likeRemainder };
     return {
-      ...enqueue(s, e, viewer, skill, units, 0, now, 'LIKE'),
-      remainingLikes: viewer.likeRemainder,
+      ...enqueue(s, e, accepted, skill, units, 0, now, 'LIKE', chooseClub),
+      remainingLikes: accepted.likeRemainder,
     };
   }
   const gift = e.gift;
   if (!gift || !gift.final) return { status: 'streak_pending' };
-  if (!viewer || !s.config.clubs.some((c) => c.id === viewer.clubId && c.enabled))
-    return reject('no_club', 'Pilih klub dulu!');
+  if (!canChooseClub) return reject('no_club', 'Pilih klub dulu!');
   if (s.status !== 'LIVE' || s.pausedAt !== null)
     return reject('round_closed', 'Ronde tidak menerima gift');
   const mapping = matchGift(s.config, gift);
@@ -181,7 +219,19 @@ export function ingest(s: RoomState, e: GameEvent, now: number): Receipt {
   if (!mapping || !skill) return reject('unmapped', 'Gift belum dipetakan');
   if (s.queue.length + gift.units > s.config.queue.capacity)
     return reject('queue_full', 'Antrean penuh; event perlu dikirim ulang', true);
-  return enqueue(s, e, viewer, skill, gift.units, mapping.contributionPoints, now, 'GIFT');
+  if (!viewer && Object.keys(s.viewers).length >= 10000)
+    return reject('viewer_capacity', 'Kapasitas penonton penuh', true);
+  return enqueue(
+    s,
+    e,
+    acceptViewer(),
+    skill,
+    gift.units,
+    mapping.contributionPoints,
+    now,
+    'GIFT',
+    chooseClub,
+  );
 }
 export function pickNext(s: RoomState, now: number): Kick | undefined {
   if (!s.queue.length) return;
@@ -394,6 +444,9 @@ export function configure(s: RoomState, c: Config, now: number) {
   );
   if (JSON.stringify(s.config.likes) !== JSON.stringify(c.likes))
     for (const viewer of Object.values(s.viewers)) viewer.likeRemainder = 0;
+  if (s.config.randomClubWithoutComment !== c.randomClubWithoutComment)
+    for (const viewer of Object.values(s.viewers))
+      if (viewer.clubSelection === 'RANDOM') viewer.likeRemainder = 0;
   s.config = c;
   s.configVersion++;
   for (const club of c.clubs) s.scores[club.id] ??= emptyScore();
@@ -408,6 +461,7 @@ export function publicSnapshot(s: RoomState, now: number) {
           skill: k.skill,
           demo: k.demo,
           source: k.source ?? (k.demo ? 'DEMO' : 'GIFT'),
+          randomClub: k.randomClub ?? false,
           outcome: k.outcome,
           startedAt: k.startedAt,
           endsAt: k.endsAt,
@@ -422,6 +476,7 @@ export function publicSnapshot(s: RoomState, now: number) {
     clubs: s.config.clubs.filter((c) => c.enabled).sort((a, b) => a.sortOrder - b.sortOrder),
     skills: s.config.skills,
     likes: s.config.likes,
+    randomClubWithoutComment: s.config.randomClubWithoutComment,
     overlay: s.config.overlay,
     giftLegend: s.config.skills
       .filter((skill) => skill.enabled)

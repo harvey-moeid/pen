@@ -59,6 +59,7 @@ export const ConfigSchema = z
     skills: z.array(SkillSchema).length(5),
     mappings: z.array(MappingSchema).max(100),
     coinFallback: z.boolean(),
+    randomClubWithoutComment: z.boolean().default(false),
     overlay: OverlaySchema.default(defaultOverlaySettings),
     likes: z
       .object({
@@ -119,6 +120,7 @@ export type Outcome = 'GOAL' | 'SAVE' | 'MISS';
 export type Score = { goals: number; skillPoints: number; giftPoints: number; kicks: number };
 export type Viewer = {
   clubId: string;
+  clubSelection?: 'COMMENT' | 'RANDOM';
   displayName: string;
   changedAt: number;
   seenAt: number;
@@ -143,6 +145,7 @@ export type Kick = {
   endsAt?: number;
   configVersion: number;
   source?: 'GIFT' | 'LIKE';
+  randomClub?: boolean;
 };
 export type MatchStatus = 'WAITING' | 'COUNTDOWN' | 'LIVE' | 'CLOSING' | 'RESULT' | 'INTERMISSION';
 export type Result = {
@@ -236,6 +239,7 @@ export function defaultConfig(): Config {
       matchPriority: 10,
     })),
     coinFallback: true,
+    randomClubWithoutComment: false,
     overlay: defaultOverlaySettings(),
     likes: defaultLikeSettings(),
     match: {

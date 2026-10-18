@@ -41,9 +41,15 @@ Chat memakai `data.username`, `data.nickname`, dan `data.message`. Lifecycle akt
 
 Konektor Node, managed, dan Python memetakan like ke `event: "like"`, dengan `data.username`, `data.nickname` opsional, `data.likeCount` berupa delta event, serta `data.totalLikeCount` berupa total room. Receiver hanya memakai **likeCount** (integer 1–1.000.000), tidak menjumlahkan totalLikeCount. Ini mencegah total kumulatif room dihitung ulang sebagai like baru.
 
-Contoh `data`: `{ "username": "viewer_unique_handle", "nickname": "Viewer", "likeCount": 25, "totalLikeCount": 50000 }`. Envelope, HMAC, batas waktu, filter room, rate limit, dan dedup sama dengan gift. Aktifkan fitur serta ambang pada `/admin/likes`, lalu pastikan penonton memilih klub sebelum memberi like.
+Contoh `data`: `{ "username": "viewer_unique_handle", "nickname": "Viewer", "likeCount": 25, "totalLikeCount": 50000 }`. Envelope, HMAC, batas waktu, filter room, rate limit, dan dedup sama dengan gift. Aktifkan fitur serta ambang pada `/admin/likes`, lalu pastikan penonton memilih klub sebelum memberi like, atau aktifkan **Gacha klub jika penonton belum memilih klub** pada `/admin/clubs`.
 
-Sisa like disimpan per penonton di state SQLite Durable Object. Pencatatan sisa, enqueue, dan receipt event berlangsung dalam transaksi yang sama. Retry ID identik tidak menambah hitungan; payload baru dengan ID baru tetap bergantung pada jaminan ID upstream yang dijelaskan di bawah. Event sebelum pilih klub, di luar LIVE/ketika pause, saat fitur nonaktif atau NORMAL nonaktif tidak ditabung untuk masa depan. Antrean penuh mengembalikan 503 tanpa konsumsi parsial.
+Sisa like disimpan per penonton di state SQLite Durable Object. Pencatatan sisa, enqueue, dan receipt event berlangsung dalam transaksi yang sama. Retry ID identik tidak menambah hitungan; payload baru dengan ID baru tetap bergantung pada jaminan ID upstream yang dijelaskan di bawah. Event sebelum pilih klub (ketika gacha nonaktif), di luar LIVE/ketika pause, saat fitur nonaktif atau NORMAL nonaktif tidak ditabung untuk masa depan. Antrean penuh mengembalikan 503 tanpa konsumsi parsial.
+
+## Gacha tanpa komentar
+
+`config.randomClubWithoutComment` bernilai `false` secara default, termasuk saat memuat konfigurasi lama. Jika aktif, gift final yang dipetakan serta like yang mencapai ambang dari penonton tanpa pilihan klub memicu undian klub aktif untuk **setiap tendangan**. Komentar kode klub tetap menjadi pilihan tetap sampai penonton menggantinya; hasil undian tidak menjadi pilihan tetap. Tendangan gacha tetap memakai peluang dan poin skill biasa, serta menyimpan `randomClub: true` dan klub hasil undian di antrean. Retry ID yang sama dan restart memulihkan hasil yang tersimpan tanpa undian ulang. Tidak perlu mengubah payload konektor.
+
+Like yang belum mencapai ambang hanya menyimpan sisa per penonton. Komentar pertama setelah gacha atau perubahan mode gacha menghapus sisa like penonton gacha, tanpa mengubah tendangan yang sudah diterima. Kapasitas penonton, kapasitas antrean, status ronde, dan mapping/skill diperiksa sebelum menerima event atau mengundi.
 
 ## Combo dan idempotency
 

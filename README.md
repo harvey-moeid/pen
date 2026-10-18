@@ -45,11 +45,17 @@ Tes browser memakai Worker, KV, R2, dan Durable Object **terisolasi**, dengan se
 
 Tes meliputi combo final, prioritas mapping, peluang 0/100%, snapshot konfigurasi, pemisahan skor, anti-starvation, burst 500 aksi, penutupan ronde, pause/resume, retry bersamaan, restart runtime dengan storage persisten, WebSocket read-only, HMAC, auth/CSRF, serta upload R2.
 
+## Gacha tanpa komentar klub
+
+Di **Admin → Klub → Event tanpa komentar klub**, aktifkan **Gacha klub jika penonton belum memilih klub** untuk menerima gift/like sebelum komentar klub. Setiap tendangan diundi secara terpisah dari klub aktif dengan peluang sama; combo dapat memilih klub berbeda. Hasil undian tidak menjadi pilihan klub tetap. Komentar kode klub menetapkan klub untuk event berikutnya tanpa menunggu cooldown dari undian. Tendangan yang sudah mengantre tetap memakai hasil undiannya, termasuk setelah retry webhook atau restart. Overlay menandai tendangan tersebut dengan **GACHA** dan menyesuaikan petunjuk bawaan; tulisan khusus operator tetap dipertahankan.
+
+Mode gacha awalnya **nonaktif**, termasuk untuk konfigurasi lama. Saat aktif, like penonton tanpa pilihan klub tetap dihitung per penonton dan baru mengundi ketika mencapai ambang; fitur like harus diaktifkan tersendiri. Perubahan mode gacha atau komentar pertama setelah gacha menghapus sisa like penonton gacha. Jika mode gacha dimatikan, event berikutnya dari penonton itu kembali memerlukan komentar klub.
+
 ## Like → tendangan normal
 
 Di **Admin → Like → tendangan**, aktifkan fitur dan isi **Jumlah like per tendangan normal** (1–1.000.000; nilai awal 100). Konfigurasi lama mendapat fitur dalam keadaan nonaktif agar deploy tidak mengubah aturan pertandingan yang sedang berjalan. Tambahkan event **like** pada daftar event webhook konektor, bersama **chat, gift, stream**.
 
-Hitungan berlaku **per penonton untuk klub yang sudah dipilih lewat komentar**, hanya ketika ronde LIVE dan tidak dijeda. Dengan ambang 100, 250 like dari satu penonton menghasilkan 2 Normal Kick dan sisa 50. Like penonton berbeda tidak digabung. Sisa bertahan setelah reload/restart backend, dan direset ketika pindah klub, ronde baru/reset, atau pengaturan like berubah. Komentar ulang untuk klub yang sama tidak mereset hitungan.
+Hitungan berlaku **per penonton**, untuk klub yang dipilih lewat komentar atau gacha jika mode tersebut aktif, hanya ketika ronde LIVE dan tidak dijeda. Dengan ambang 100, 250 like dari satu penonton menghasilkan 2 Normal Kick dan sisa 50. Like penonton berbeda tidak digabung. Sisa bertahan setelah reload/restart backend, dan direset ketika pindah klub, ronde baru/reset, atau pengaturan like berubah. Komentar ulang untuk klub yang sama tidak mereset hitungan.
 
 Tendangan memakai peluang, poin saat gol, animasi, durasi, dan prioritas skill **NORMAL**. Skill harus aktif. Like tidak memerlukan Gift ID, tidak menambah poin gift, dan tetap melewati antrean serta dedup webhook. Saat kapasitas tidak cukup, seluruh event mendapat 503 tanpa menghabiskan sisa like; retry dengan ID sama dapat diterima setelah kapasitas tersedia. Petunjuk like otomatis tampil pada overlay saat fitur aktif.
 

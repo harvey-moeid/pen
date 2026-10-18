@@ -497,4 +497,72 @@ describe.sequential('real Workers runtime + SQLite Durable Object + KV + R2', ()
     ).toBe(400);
     expect((await admin()).configVersion).toBe(recovered.configVersion);
   });
+  it('persists gacha assignments and partial likes across restart without redrawing retried gifts', async () => {
+    const d = await admin();
+    d.config.randomClubWithoutComment = true;
+    d.config.queue.capacity = 20;
+    expect(
+      (
+        await request(
+          '/api/admin/config',
+          'PUT',
+          { version: d.configVersion, config: d.config },
+          true,
+        )
+      ).status,
+    ).toBe(200);
+    const payload = {
+      username: 'gacha-viewer',
+      nickname: 'Gacha Viewer',
+      giftId: '5655',
+      diamondCount: 1,
+      repeatCount: 2,
+      repeatEnd: true,
+      giftType: 1,
+    };
+    const receipts = await Promise.all(
+      Array.from(
+        { length: 5 },
+        async () =>
+          (await hook('gift', payload, 'gacha-gift')).json() as Promise<{ status: string }>,
+      ),
+    );
+    expect(receipts.filter((r) => r.status === 'queued')).toHaveLength(1);
+    expect(receipts.filter((r) => r.status === 'duplicate')).toHaveLength(4);
+    const before = (await admin()).snapshot;
+    const assignments = (snapshot: Snapshot) =>
+      [snapshot.active, ...snapshot.queue]
+        .filter((kick) => kick?.id.startsWith('gacha-gift:'))
+        .map((kick) => ({ id: kick!.id, clubId: kick!.clubId, randomClub: kick!.randomClub }));
+    expect(assignments(before)).toHaveLength(2);
+    expect(
+      assignments(before).every(
+        (kick) => kick.randomClub && before.clubs.some((club) => club.id === kick.clubId),
+      ),
+    ).toBe(true);
+    expect(
+      await (
+        await hook('like', { username: 'gacha-like-viewer', likeCount: 60 }, 'gacha-partial')
+      ).json(),
+    ).toMatchObject({ status: 'likes_accumulated', remainingLikes: 60 });
+    await mf.dispose();
+    mf = create();
+    await mf.ready;
+    expect((await admin()).config.randomClubWithoutComment).toBe(true);
+    expect(await (await hook('gift', payload, 'gacha-gift')).json()).toMatchObject({
+      status: 'duplicate',
+      actions: 2,
+    });
+    expect(assignments((await admin()).snapshot)).toEqual(assignments(before));
+    expect(
+      await (
+        await hook('like', { username: 'gacha-like-viewer', likeCount: 40 }, 'gacha-threshold')
+      ).json(),
+    ).toMatchObject({ status: 'queued', actions: 1, remainingLikes: 0 });
+    const after = (await admin()).snapshot;
+    const likeKick = [after.active, ...after.queue].find(
+      (kick) => kick?.id === 'gacha-threshold:0',
+    );
+    expect(likeKick).toMatchObject({ source: 'LIKE', randomClub: true });
+  });
 });
