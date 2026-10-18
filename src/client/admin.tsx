@@ -465,6 +465,32 @@ export function Admin() {
         )}
         {page === 'clubs' && (
           <>
+            <section className="panel padded">
+              <h3>Contoh aset siap unggah</h3>
+              <p>
+                Coba logo transparan dan karakter miniatur ini pada satu klub. Buka panduan untuk
+                ukuran logo, arah hadap model, material, serta animasi yang didukung.
+              </p>
+              <div className="asset-example-links">
+                <a className="button" href="/examples/logo-pb.png" download>
+                  <Download size={14} /> Contoh logo PNG
+                </a>
+                <a className="button" href="/examples/character-pb.glb" download>
+                  <Download size={14} /> Contoh karakter GLB
+                </a>
+                <a className="button" href="/examples/penalty-battle-assets.zip" download>
+                  <Download size={14} /> Paket lengkap + panduan
+                </a>
+                <a className="button" href="/examples/preview.png" target="_blank" rel="noreferrer">
+                  Lihat contoh <ExternalLink size={14} />
+                </a>
+              </div>
+              <small>
+                Logo: PNG/WebP/JPG. Model: GLB mandiri, +Y atas, wajah +Z, kaki Y=0. Clip animasi
+                pertama diputar sebagai idle; model custom belum memilih clip tendangan otomatis.
+                Masing-masing berkas maksimal 20 MB.
+              </small>
+            </section>
             <div className="notice">
               Maksimal 8 klub. Semua klub aktif ditampilkan dalam satu baris. Nonaktifkan klub lama
               untuk mempertahankan riwayat; ubah formasi setelah ronde selesai.

@@ -5,6 +5,7 @@
     "Reset persists; forced SAVE yields no goal",
     "Mobile 390px: all 5 clubs, no horizontal overflow",
     "Admin login and all 13 admin routes render",
+    "Sample ZIP downloads; PNG and GLB upload through admin and load together in the real overlay",
     "Admin like threshold and toggle persist; logo image and optional GLB labels are distinct",
     "Overlay editor persists text/color/size; live updates without reload, hides sections, escapes HTML, and fits mobile",
     "Text reset stays local until save and restores overlay without changing like settings",

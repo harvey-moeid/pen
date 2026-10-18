@@ -174,6 +174,62 @@ try {
     5,
   );
   await expect(page.getByText('Model karakter 3D opsional (GLB, maks. 20 MB)')).toHaveCount(5);
+  await expect(page.getByRole('link', { name: 'Paket lengkap + panduan' })).toHaveAttribute(
+    'href',
+    '/examples/penalty-battle-assets.zip',
+  );
+  const samplePack = await context.request.get(base + '/examples/penalty-battle-assets.zip');
+  assert.equal(samplePack.status(), 200);
+  assert.equal((await samplePack.body()).subarray(0, 2).toString(), 'PK');
+  const beforeSamples = await (await context.request.get(base + '/api/admin/state')).json();
+  const clubCard = page.locator('.admin-cards > section').first();
+  await page
+    .getByLabel('Logo klub berupa gambar (PNG/WebP/JPG, maks. 20 MB)')
+    .first()
+    .setInputFiles(resolve('public/examples/logo-pb.png'));
+  await expect(clubCard.locator('img')).toBeVisible();
+  await page
+    .getByLabel('Model karakter 3D opsional (GLB, maks. 20 MB)')
+    .first()
+    .setInputFiles(resolve('public/examples/character-pb.glb'));
+  await expect(clubCard.locator('.asset-key').filter({ hasText: '.glb' })).toBeVisible();
+  await page.getByRole('button', { name: 'Simpan perubahan' }).click();
+  await expect(page.getByRole('status')).toContainText('tersimpan');
+  const sampleConfig = await (await context.request.get(base + '/api/admin/state')).json();
+  const sampleLive = await context.newPage();
+  sampleLive.on('pageerror', (e) => errors.push(e.message));
+  await sampleLive.setViewportSize({ width: 390, height: 844 });
+  const modelResponse = sampleLive.waitForResponse(
+    (response) =>
+      response.url().endsWith('/media/' + sampleConfig.config.clubs[0].characterAssetKey) &&
+      response.status() === 200,
+  );
+  await sampleLive.goto(base + '/live');
+  await modelResponse;
+  await expect(sampleLive.locator('.player-label')).toHaveCount(5);
+  await sampleLive
+    .locator('.live-scores img')
+    .first()
+    .evaluate((img) => img.decode());
+  await sampleLive.waitForTimeout(1000);
+  await expect(sampleLive.locator('.arena-error')).toHaveCount(0);
+  await expect(sampleLive.locator('.arena-canvas')).not.toHaveAttribute('data-asset-warning', /.+/);
+  await sampleLive.screenshot({ path: join(out, 'example-assets-uploaded.png'), fullPage: true });
+  const restoreSamples = await (await context.request.get(base + '/api/admin/state')).json();
+  restoreSamples.config.clubs = beforeSamples.config.clubs;
+  assert.equal(
+    (
+      await context.request.put(base + '/api/admin/config', {
+        headers: { Origin: base },
+        data: { version: restoreSamples.configVersion, config: restoreSamples.config },
+      })
+    ).status(),
+    200,
+  );
+  await sampleLive.close();
+  checks.push(
+    'Sample ZIP downloads; PNG and GLB upload through admin and load together in the real overlay',
+  );
   await page.goto(base + '/admin/likes');
   await page.getByLabel('Aktifkan tendangan dari like').check();
   await page.getByLabel('Jumlah like per tendangan normal').fill('100');

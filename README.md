@@ -55,6 +55,8 @@ Tendangan memakai peluang, poin saat gol, animasi, durasi, dan prioritas skill *
 
 Logo klub opsional dan memakai **PNG, WebP, atau JPG**, maksimal 20 MB. **GLB hanya untuk model karakter 3D** pengganti; tanpa GLB, karakter bawaan tetap tersedia.
 
+Contoh siap unggah tersedia di **Admin → Klub → Contoh aset siap unggah**: [logo PNG](public/examples/logo-pb.png), [karakter GLB](public/examples/character-pb.glb), [pratinjau depan/belakang](public/examples/preview.png), dan [panduan aset](public/examples/PANDUAN-ASET.md). Model contoh hanya memakai clip `Idle`, sesuai loader saat ini; pemetaan otomatis Walk/Kick/Celebrate belum tersedia untuk model impor.
+
 ## Teks overlay
 
 Di **Admin → Teks overlay**, pilih satu dari 24 bagian tulisan: judul/subjudul, petunjuk, label arena, nama pendukung/skill saat tendangan, hasil ronde, klasemen, antrean, dan status. Isi maksimal 240 karakter per bagian, warna HEX, ukuran relatif 50–200%, serta sakelar tampil/sembunyikan. Isi kosong juga menyembunyikan bagian tersebut.
