@@ -383,4 +383,76 @@ describe.sequential('real Workers runtime + SQLite Durable Object + KV + R2', ()
       true,
     );
   }, 20000);
+  it('persists like remainders across runtime restart and deduplicates kicks and backpressure retries', async () => {
+    const d = await admin();
+    d.config.likes = { enabled: true, likesPerKick: 100 };
+    d.config.queue.capacity = 2;
+    d.config.skills[0].goalChancePercent = 100;
+    d.config.skills[0].durationMs = 3000;
+    expect(
+      (
+        await request(
+          '/api/admin/config',
+          'PUT',
+          { version: d.configVersion, config: d.config },
+          true,
+        )
+      ).status,
+    ).toBe(200);
+    await request('/api/admin/control', 'POST', { action: 'start' }, true);
+    await hook('chat', { username: 'like-viewer', message: 'RMA' }, 'like-club');
+    expect(
+      await (
+        await hook(
+          'like',
+          { username: 'like-viewer', likeCount: 60, totalLikeCount: 50000 },
+          'partial-likes',
+        )
+      ).json(),
+    ).toMatchObject({ status: 'likes_accumulated', remainingLikes: 60 });
+    expect(
+      await (
+        await hook('like', { username: 'like-viewer', likeCount: 60 }, 'partial-likes')
+      ).json(),
+    ).toMatchObject({ status: 'duplicate', remainingLikes: 60 });
+    await mf.dispose();
+    mf = create();
+    await mf.ready;
+    expect((await admin()).config.likes).toEqual({ enabled: true, likesPerKick: 100 });
+    const responses = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        hook('like', { username: 'like-viewer', likeCount: 190 }, 'like-burst'),
+      ),
+    );
+    const receipts = await Promise.all(
+      responses.map(
+        async (response) =>
+          (await response.json()) as { status: string; actions?: number; remainingLikes?: number },
+      ),
+    );
+    expect(receipts.filter((r) => r.status === 'queued')).toHaveLength(1);
+    expect(receipts.filter((r) => r.status === 'duplicate')).toHaveLength(9);
+    expect(receipts.find((r) => r.status === 'queued')).toMatchObject({
+      actions: 2,
+      remainingLikes: 50,
+    });
+    const active = (await admin()).snapshot;
+    expect(active.active?.skill.id).toBe('NORMAL');
+    expect(active.active?.source).toBe('LIKE');
+    expect(active.queueDepth).toBe(1);
+    const overflow = await hook(
+      'like',
+      { username: 'like-viewer', likeCount: 200 },
+      'like-overflow',
+    );
+    expect(overflow.status).toBe(503);
+    await new Promise((resolve) => setTimeout(resolve, 6500));
+    const resolved = (await admin()).snapshot;
+    expect(resolved.scores.rma).toEqual({ goals: 2, kicks: 2, skillPoints: 2, giftPoints: 0 });
+    expect(
+      await (
+        await hook('like', { username: 'like-viewer', likeCount: 200 }, 'like-overflow')
+      ).json(),
+    ).toMatchObject({ status: 'queued', actions: 2, remainingLikes: 50 });
+  }, 20000);
 });

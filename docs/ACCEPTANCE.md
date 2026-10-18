@@ -2,24 +2,25 @@
 
 Status ini memisahkan implementasi yang dapat diuji lokal dari acceptance pada layanan/perangkat produksi. Tidak mengklaim seluruh PRD sudah terbukti pada TikTok LIVE.
 
-| Area                                                                | Implementasi / bukti                                                                               |
-| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| 5 klub dalam satu baris, gawang, titik penalti, kiper               | Arena prosedural Three.js; pengujian browser memeriksa semua label dan gerak pemain aktif          |
-| Berjalan maju, tendangan, reaksi, kembali tanpa spawn karakter baru | Joint/bone animation prosedural, satu objek per klub; efek skill dipool                            |
-| Normal + 4 skill, hasil gol/gagal                                   | Gerak badan, timing, lintasan, dan efek berbeda; simulator memaksa GOAL/SAVE/MISS tanpa API resmi  |
-| Portrait / landscape / safe area / kualitas                         | Layout responsif, 3 quality preset, safe area admin; screenshot otomatis                           |
-| Komentar dan cooldown klub                                          | Validasi kode aktif, snapshot klub pada enqueue; unit tests                                        |
-| Gift khusus Normal, 1/5/10/30 fallback                              | Admin mapping dengan aturan prioritas; normal wajib Gift ID konkret; unit tests                    |
-| Combo/retry/dedup                                                   | Final-only + durable receipt; 30 retry paralel, restart runtime; upstream ID baru masih blocker    |
-| Antrean pintar tanpa starvation                                     | Aging + batas jumlah/candidate overtaking; stress 500 aksi dan full-combo backpressure             |
-| TIME / TARGET_GOALS / ENDLESS                                       | Countdown, pause/resume, closing-drain, result, intermission, auto-restart; unit/integration tests |
-| Tiga metrik terpisah                                                | Goals, skillPoints, giftPoints pada klub dan supporter; demo tidak mengubah angka                  |
-| Konfigurasi dan riwayat                                             | Versioned config + audit, DO authoritative, KV outbox, hasil aman sebelum reset                    |
-| Catatan outcome per tendangan                                       | SQLite internal DO menyimpan ACTIVE/DONE dan snapshot peluang/poin/durasi/config                   |
-| R2                                                                  | Upload admin dibatasi tipe/ukuran, URL immutable, loader GLB dan crest                             |
-| Auth / public overlay                                               | Server session HttpOnly, CSRF origin, HMAC/replay check, read-only WebSocket, input limits         |
-| Reconnect/recovery                                                  | Snapshot melalui WebSocket, exponential backoff, server alarm, tes runtime teardown/restart        |
-| Observability                                                       | Dashboard last event/delay, accepted/rejected/duplicate, queue/outbox, structured logs             |
+| Area                                                                | Implementasi / bukti                                                                                                       |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| 5 klub dalam satu baris, gawang, titik penalti, kiper               | Arena prosedural Three.js; pengujian browser memeriksa semua label dan gerak pemain aktif                                  |
+| Berjalan maju, tendangan, reaksi, kembali tanpa spawn karakter baru | Joint/bone animation prosedural, satu objek per klub; efek skill dipool                                                    |
+| Normal + 4 skill, hasil gol/gagal                                   | Gerak badan, timing, lintasan, dan efek berbeda; simulator memaksa GOAL/SAVE/MISS tanpa API resmi                          |
+| Portrait / landscape / safe area / kualitas                         | Layout responsif, 3 quality preset, safe area admin; screenshot otomatis                                                   |
+| Komentar dan cooldown klub                                          | Validasi kode aktif, snapshot klub pada enqueue; unit tests                                                                |
+| Like → Normal Kick                                                  | Ambang admin per penonton, sisa persisten, reset per klub/ronde/aturan, dedup dan backpressure; unit/runtime/browser tests |
+| Gift khusus Normal, 1/5/10/30 fallback                              | Admin mapping dengan aturan prioritas; normal wajib Gift ID konkret; unit tests                                            |
+| Combo/retry/dedup                                                   | Final-only + durable receipt; 30 retry paralel, restart runtime; upstream ID baru masih blocker                            |
+| Antrean pintar tanpa starvation                                     | Aging + batas jumlah/candidate overtaking; stress 500 aksi dan full-combo backpressure                                     |
+| TIME / TARGET_GOALS / ENDLESS                                       | Countdown, pause/resume, closing-drain, result, intermission, auto-restart; unit/integration tests                         |
+| Tiga metrik terpisah                                                | Goals, skillPoints, giftPoints pada klub dan supporter; demo tidak mengubah angka                                          |
+| Konfigurasi dan riwayat                                             | Versioned config + audit, DO authoritative, KV outbox, hasil aman sebelum reset                                            |
+| Catatan outcome per tendangan                                       | SQLite internal DO menyimpan ACTIVE/DONE dan snapshot peluang/poin/durasi/config                                           |
+| R2                                                                  | Upload admin dibatasi tipe/ukuran, URL immutable, loader GLB dan crest                                                     |
+| Auth / public overlay                                               | Server session HttpOnly, CSRF origin, HMAC/replay check, read-only WebSocket, input limits                                 |
+| Reconnect/recovery                                                  | Snapshot melalui WebSocket, exponential backoff, server alarm, tes runtime teardown/restart                                |
+| Observability                                                       | Dashboard last event/delay, accepted/rejected/duplicate, queue/outbox, structured logs                                     |
 
 ## Batas acceptance yang belum boleh ditandai selesai
 

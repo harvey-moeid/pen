@@ -118,7 +118,11 @@ export function ArenaView({ snapshot, offset = 0 }: { snapshot: Snapshot; offset
           className={'kick-announcement ' + (p > 0.65 && p < 0.83 ? 'result' : '')}
           style={{ '--skill': skillColors[skillIndex] } as React.CSSProperties}
         >
-          <span>{k.demo ? 'DEMO · TANPA SKOR' : k.supporterName}</span>
+          <span>
+            {k.demo
+              ? 'DEMO · TANPA SKOR'
+              : `${k.source === 'LIKE' ? 'LIKE · ' : ''}${k.supporterName}`}
+          </span>
           <strong>{p > 0.65 && p < 0.83 ? k.outcome : k.skill.label}</strong>
         </div>
       )}

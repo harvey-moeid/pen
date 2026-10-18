@@ -28,6 +28,7 @@ npm run dev
 - `/live`: overlay publik read-only dengan WebSocket dan pemulihan snapshot.
 - `/admin`: login operator menggunakan `ADMIN_SECRET`; cookie HttpOnly, SameSite Strict, Secure di HTTPS.
 - Semua halaman admin: integrasi, klub, gift, skill, kiper, ronde, antrean, leaderboard, visual, riwayat.
+- `/admin/likes`: aktifkan like → Normal Kick dan tentukan ambang per penonton.
 
 Pratinjau `/` juga berjalan tanpa backend setelah aset aplikasi dimuat. Pilih klub dan skill; dropdown **Hasil uji** dapat memaksa GOAL/SAVE/MISS untuk uji animasi. Tombol reset hanya mereset simulasi browser.
 
@@ -42,6 +43,16 @@ npm run test:browser   # jalankan setelah build; membutuhkan Chromium
 Tes browser memakai Worker, KV, R2, dan Durable Object **terisolasi**, dengan secret acak sementara. Tidak memakai kredensial atau pertandingan produksi. Jika Chromium belum tersedia, jalankan `npx playwright install chromium`; atau set `CHROMIUM_PATH` ke browser lokal. Screenshot dan laporan tersimpan di `artifacts/` (tidak masuk Git).
 
 Tes meliputi combo final, prioritas mapping, peluang 0/100%, snapshot konfigurasi, pemisahan skor, anti-starvation, burst 500 aksi, penutupan ronde, pause/resume, retry bersamaan, restart runtime dengan storage persisten, WebSocket read-only, HMAC, auth/CSRF, serta upload R2.
+
+## Like → tendangan normal
+
+Di **Admin → Like → tendangan**, aktifkan fitur dan isi **Jumlah like per tendangan normal** (1–1.000.000; nilai awal 100). Konfigurasi lama mendapat fitur dalam keadaan nonaktif agar deploy tidak mengubah aturan pertandingan yang sedang berjalan. Tambahkan event **like** pada daftar event webhook konektor, bersama **chat, gift, stream**.
+
+Hitungan berlaku **per penonton untuk klub yang sudah dipilih lewat komentar**, hanya ketika ronde LIVE dan tidak dijeda. Dengan ambang 100, 250 like dari satu penonton menghasilkan 2 Normal Kick dan sisa 50. Like penonton berbeda tidak digabung. Sisa bertahan setelah reload/restart backend, dan direset ketika pindah klub, ronde baru/reset, atau pengaturan like berubah. Komentar ulang untuk klub yang sama tidak mereset hitungan.
+
+Tendangan memakai peluang, poin saat gol, animasi, durasi, dan prioritas skill **NORMAL**. Skill harus aktif. Like tidak memerlukan Gift ID, tidak menambah poin gift, dan tetap melewati antrean serta dedup webhook. Saat kapasitas tidak cukup, seluruh event mendapat 503 tanpa menghabiskan sisa like; retry dengan ID sama dapat diterima setelah kapasitas tersedia. Petunjuk like otomatis tampil pada overlay saat fitur aktif.
+
+Logo klub opsional dan memakai **PNG, WebP, atau JPG**, maksimal 20 MB. **GLB hanya untuk model karakter 3D** pengganti; tanpa GLB, karakter bawaan tetap tersedia.
 
 ## CI GitHub Actions
 
@@ -102,6 +113,6 @@ npm run deploy
 
 `wrangler.jsonc` menyertakan migrasi SQLite Durable Object, static SPA assets, observability, KV, R2, dan deklarasi secret yang diperlukan. Namespace KV `penalty-battle-3d-CONFIG` dan bucket `penalty-battle-assets` telah disiapkan di akun Cloudflare `harvey`. Gunakan akun tersebut untuk deploy; untuk akun lain, provision resource baru dan perbarui binding serta konfigurasi CD terlebih dahulu. CD dapat melakukan deploy pertama dengan empat secret GitHub, tanpa perintah lokal di atas.
 
-Setelah deploy, login admin, kosongkan **Filter Room ID TikTok** untuk konektor dengan signing secret khusus (atau isi ID siaran yang benar jika perlu pembatasan), pilih **Gift ID Normal**, periksa mapping/kontribusi/probabilitas, lalu simpan dan mulai ronde. Tambahkan endpoint `/api/hooks/tiktok` pada dashboard konektor untuk event **chat, gift, stream**. Secret tidak boleh dimasukkan ke URL overlay atau source frontend.
+Setelah deploy, login admin, kosongkan **Filter Room ID TikTok** untuk konektor dengan signing secret khusus (atau isi ID siaran yang benar jika perlu pembatasan), pilih **Gift ID Normal** untuk pemicu gift atau aktifkan pemicu like, periksa mapping/kontribusi/probabilitas, lalu simpan dan mulai ronde. Tambahkan endpoint `/api/hooks/tiktok` pada dashboard konektor untuk event **chat, gift, like, stream**. Secret tidak boleh dimasukkan ke URL overlay atau source frontend.
 
 **Status produksi:** kode konektor telah diaudit pada commit `3660b385078318e2d10782ddf1e00dc8492d3b28`. Pengujian memakai payload kontrak dan HMAC nyata di runtime lokal, belum delivery TikTok LIVE sungguhan. ID pesan upstream belum diteruskan konektor dan delivery retry-nya belum durable; kedua batas tersebut perlu ditangani/diterima sebelum siaran publik berbayar. FPS di perangkat OBS/LIVE Studio dan aset GLB final juga harus diuji. Jangan mengartikan simulator atau tes sintetis sebagai bukti kesiapan produksi penuh.

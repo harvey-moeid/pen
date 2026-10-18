@@ -6,7 +6,7 @@ Sumber yang diperiksa: `server/events.js`, `server/gifts.js`, `server/tiktok.js`
 
 ## Transport aktual
 
-Gunakan fitur **Integrasi Webhook** yang sudah ada, bukan membuat koneksi TikTok tambahan. URL receiver game: `https://<domain-game>/api/hooks/tiktok`. Pilih event `chat`, `gift`, `stream`.
+Gunakan fitur **Integrasi Webhook** yang sudah ada, bukan membuat koneksi TikTok tambahan. URL receiver game: `https://<domain-game>/api/hooks/tiktok`. Pilih event `chat`, `gift`, `like`, `stream`.
 
 Header `x-tlk-signature: sha256=<hex HMAC-SHA256>` ditandatangani atas `x-tlk-timestamp + "." + rawBody`. Timestamp berupa Unix detik. Receiver memverifikasi raw body, timestamp maksimal ±300 detik, signature, schema, filter room sumber jika diisi, dan ID. Metadata header event ID tidak dipercaya; ID dalam body yang sudah diverifikasi digunakan.
 
@@ -36,6 +36,14 @@ Header `x-tlk-signature: sha256=<hex HMAC-SHA256>` ditandatangani atas `x-tlk-ti
 Gift ID di contoh bukan penetapan Normal Kick. Admin harus memilih Gift ID nyata yang diinginkan. `diamondCount` adalah koin **per unit**. `totalValue` tidak dipakai sebagai pemicu skill agar combo 3×1 tidak berubah menjadi skill bernilai 3.
 
 Chat memakai `data.username`, `data.nickname`, dan `data.message`. Lifecycle aktual Node connector adalah `event: "stream"`, `data.state: "started" | "ended"`; bukan mengasumsikan event connected/disconnected tersedia. Adapter juga memahami connected/disconnected/reconnecting jika bridge lain secara eksplisit meneruskannya.
+
+## Event like
+
+Konektor Node, managed, dan Python memetakan like ke `event: "like"`, dengan `data.username`, `data.nickname` opsional, `data.likeCount` berupa delta event, serta `data.totalLikeCount` berupa total room. Receiver hanya memakai **likeCount** (integer 1–1.000.000), tidak menjumlahkan totalLikeCount. Ini mencegah total kumulatif room dihitung ulang sebagai like baru.
+
+Contoh `data`: `{ "username": "viewer_unique_handle", "nickname": "Viewer", "likeCount": 25, "totalLikeCount": 50000 }`. Envelope, HMAC, batas waktu, filter room, rate limit, dan dedup sama dengan gift. Aktifkan fitur serta ambang pada `/admin/likes`, lalu pastikan penonton memilih klub sebelum memberi like.
+
+Sisa like disimpan per penonton di state SQLite Durable Object. Pencatatan sisa, enqueue, dan receipt event berlangsung dalam transaksi yang sama. Retry ID identik tidak menambah hitungan; payload baru dengan ID baru tetap bergantung pada jaminan ID upstream yang dijelaskan di bawah. Event sebelum pilih klub, di luar LIVE/ketika pause, saat fitur nonaktif atau NORMAL nonaktif tidak ditabung untuk masa depan. Antrean penuh mengembalikan 503 tanpa konsumsi parsial.
 
 ## Combo dan idempotency
 

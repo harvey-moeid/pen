@@ -382,7 +382,11 @@ function Live() {
         <ArenaView snapshot={snapshot} offset={offset.current} />
       </div>
       <div className="live-instructions">
-        <span className="eyebrow">KOMENTAR KODE KLUB → KIRIM GIFT → TENDANG!</span>
+        <span className="eyebrow">
+          {snapshot.likes?.enabled
+            ? 'KOMENTAR KODE KLUB → LIKE / GIFT → TENDANG!'
+            : 'KOMENTAR KODE KLUB → KIRIM GIFT → TENDANG!'}
+        </span>
         <strong>Pilih klub dulu!</strong>
         <div className="club-codes">
           {snapshot.clubs.map((c) => (
@@ -390,6 +394,12 @@ function Live() {
           ))}
         </div>
         <p>Gift sebelum memilih klub tidak memicu aksi atau skor.</p>
+        {snapshot.likes?.enabled && (
+          <p>
+            Setiap {snapshot.likes.likesPerKick} like per penonton → 1 tendangan normal untuk klub
+            pilihannya. Pilih klub sebelum memberi like!
+          </p>
+        )}
         <div className="live-gift-legend">
           {snapshot.giftLegend.map((s, i) => (
             <span key={s.skillId} style={{ color: skillColors[i] }}>

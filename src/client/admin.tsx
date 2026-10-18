@@ -17,7 +17,7 @@ import {
 import { ConfigSchema, defaultConfig, skillIds, type Config } from '../game/model';
 import type { Snapshot } from '../game/engine';
 import { api, useLive } from './hooks';
-import { Scoreboard, Connection, RoundTimer } from './components';
+import { Scoreboard, Connection, RoundTimer, Crest } from './components';
 type AdminData = {
   config: Config;
   configVersion: number;
@@ -33,6 +33,7 @@ const pages = [
   ['integration', 'Integrasi'],
   ['clubs', 'Klub'],
   ['gifts', 'Mapping gift'],
+  ['likes', 'Like → tendangan'],
   ['skills', 'Skill & peluang'],
   ['goalkeeper', 'Kiper'],
   ['match', 'Ronde'],
@@ -347,7 +348,7 @@ export function Admin() {
           <>
             <div className="metric-grid">
               {[
-                ['Gift diterima', data?.stats.accepted],
+                ['Tendangan diterima', data?.stats.accepted],
                 ['Event ditolak', data?.stats.rejected],
                 ['Retry duplikat', data?.stats.duplicates],
                 ['Arsip menunggu', data?.archivePending],
@@ -385,8 +386,8 @@ export function Admin() {
               </p>
               <code className="code-block">{integration?.endpoint ?? '/api/hooks/tiktok'}</code>
               <p>
-                Tambahkan endpoint ini pada dashboard konektor. Pilih event chat, gift, stream.
-                Samakan WEBHOOK_SIGNING_SECRET melalui secret Worker dan konektor.
+                Tambahkan endpoint ini pada dashboard konektor. Pilih event chat, gift, like,
+                stream. Samakan WEBHOOK_SIGNING_SECRET melalui secret Worker dan konektor.
               </p>
               <Field
                 label="Filter Room ID TikTok (opsional)"
@@ -538,7 +539,7 @@ export function Admin() {
                     />
                   </div>
                   <label className="field">
-                    <span>Karakter GLB (maks. 20 MB)</span>
+                    <span>Model karakter 3D opsional (GLB, maks. 20 MB)</span>
                     <input
                       type="file"
                       accept=".glb"
@@ -568,7 +569,7 @@ export function Admin() {
                     </p>
                   )}
                   <label className="field">
-                    <span>Logo orisinal (PNG/WebP/JPG)</span>
+                    <span>Logo klub berupa gambar (PNG/WebP/JPG, maks. 20 MB)</span>
                     <input
                       type="file"
                       accept="image/png,image/webp,image/jpeg"
@@ -582,6 +583,29 @@ export function Admin() {
                       }
                     />
                   </label>
+                  <small>
+                    Logo memakai gambar; GLB hanya untuk mengganti karakter 3D. Keduanya opsional.
+                  </small>
+                  {club.logoAssetKey && (
+                    <div className="asset-key">
+                      <Crest
+                        code={club.code}
+                        color={club.primaryColor}
+                        asset={club.logoAssetKey}
+                        small
+                      />
+                      <button
+                        className="text-button"
+                        onClick={() =>
+                          edit((c) => {
+                            delete c.clubs[i].logoAssetKey;
+                          })
+                        }
+                      >
+                        Gunakan logo bawaan
+                      </button>
+                    </div>
+                  )}
                 </section>
               ))}
             </div>
@@ -699,6 +723,52 @@ export function Admin() {
             ))}
           </div>
         )}
+        {page === 'likes' && (
+          <section className="panel padded">
+            <h3>Like memicu tendangan normal</h3>
+            <Toggle
+              label="Aktifkan tendangan dari like"
+              value={draft.likes.enabled}
+              onChange={(v) =>
+                edit((c) => {
+                  c.likes.enabled = v;
+                })
+              }
+            />
+            <Field
+              label="Jumlah like per tendangan normal"
+              value={draft.likes.likesPerKick}
+              min={1}
+              max={1000000}
+              onChange={(v) =>
+                edit((c) => {
+                  c.likes.likesPerKick = +v;
+                })
+              }
+            />
+            <p>
+              Dihitung per penonton untuk klub yang dipilih lewat komentar. Setiap{' '}
+              {draft.likes.likesPerKick || 'N'} like memicu 1 Normal Kick. Misalnya, ambang 100
+              dengan 250 like menghasilkan 2 tendangan dan menyimpan sisa 50 like.
+            </p>
+            <p>
+              Like hanya dihitung saat ronde LIVE, tidak dijeda, dan penonton sudah memilih klub.
+              Sisa like direset ketika pindah klub, ronde baru/reset, atau pengaturan like berubah.
+              Tendangan yang sudah mengantre tetap berjalan dengan aturan saat diterima.
+            </p>
+            <p>
+              Peluang gol, poin saat gol, durasi, dan prioritas mengikuti skill NORMAL pada menu
+              Skill & peluang. Tendangan like tidak menambah poin gift dan tidak memerlukan mapping
+              Gift ID. Tambahkan event <code>like</code> pada webhook konektor, lalu simpan
+              pengaturan.
+            </p>
+            {!draft.skills.find((skill) => skill.id === 'NORMAL')?.enabled && (
+              <div className="error">
+                Skill NORMAL sedang nonaktif. Aktifkan agar like dapat memicu tendangan.
+              </div>
+            )}
+          </section>
+        )}
         {page === 'gifts' && (
           <>
             <div className="panel padded">
@@ -712,12 +782,14 @@ export function Admin() {
                 }
               />
               <p>
-                Normal Kick wajib dipetakan ke Gift ID khusus. Gift ID spesifik mengalahkan fallback
-                koin; Normal memiliki prioritas ketika ID sama.
+                Pemicu gift untuk Normal Kick memakai Gift ID khusus. Pemicu like diatur terpisah di
+                menu Like → tendangan. Gift ID spesifik mengalahkan fallback koin; Normal memiliki
+                prioritas ketika ID sama.
               </p>
               {!draft.mappings.some((m) => m.enabled && m.skillId === 'NORMAL' && m.giftId) && (
                 <div className="notice">
-                  Normal Kick belum memiliki Gift ID. Tambahkan mapping sebelum LIVE.
+                  Pemicu gift untuk Normal Kick belum dipetakan. Like tetap dapat memicu Normal Kick
+                  jika diaktifkan di menu Like → tendangan.
                 </div>
               )}
               {draft.mappings.some(

@@ -28,13 +28,14 @@ Outbox memakai compare-and-delete dan satu flush per instance untuk melindungi k
 
 - Maksimum **8 klub** aktif/tersimpan dalam konfigurasi awal; semuanya dirender. Lima klub bawaan. Klub lama dinonaktifkan, tidak dihapus atau digunakan ulang ID-nya.
 - Urutan baris mengikuti `sortOrder`. Perubahan struktur klub dan aturan ronde hanya di antara ronde; perubahan skill berlaku untuk enqueue berikutnya.
-- Normal hanya melalui Gift ID eksplisit. Default koin 1/5/10/30 untuk empat skill; fallback dapat dimatikan. Matching: Normal dengan ID yang sama → ID spesifik → fallback koin → matchPriority tertinggi → ID mapping untuk determinisme.
+- Pemicu gift untuk Normal memakai Gift ID eksplisit; pemicu like opsional memakai ambang per penonton. Default koin 1/5/10/30 untuk empat skill; fallback dapat dimatikan. Matching gift: Normal dengan ID yang sama → ID spesifik → fallback koin → matchPriority tertinggi → ID mapping untuk determinisme.
+- Like memakai delta `likeCount`, dengan hitungan sisa per viewer pada klub pilihannya. Setiap ambang lengkap enqueue satu NORMAL dengan kontribusi gift 0. Counter, receipt, dan antrean ditulis atomik; overload 503 tidak menghabiskan sisa. Sisa direset pada pindah klub, ronde/reset, dan perubahan pengaturan like. Konfigurasi lama tanpa `likes` dibaca dengan default nonaktif dan ambang 100; viewer lama tanpa counter mulai dari 0. Data lama, antrean, dan skor tetap dapat dibaca tanpa migrasi SQLite tambahan.
 - Satu unit final gift = satu aksi. Tidak ada akumulasi gift kecil menjadi skill besar.
 - Antrean default 500, maksimum konfigurasi 2000 aksi. FIFO sebagai dasar; candidate window maksimum `maxOvertakes+1`, prioritas tier + aging, penghentian overtaking setelah batas tercapai. `maxWaitMs` memaksa FIFO untuk aksi yang sudah lama, **bukan SLA** penyelesaian antrean.
 - Overflow menerima **nol** unit dari event tersebut, mengembalikan 503 `retryable:true`, tanpa receipt dedup permanen. Retry dengan ID sama dapat diterima ketika kapasitas tersedia. Tidak ada antrean tak terbatas atau janji kompensasi otomatis.
 - Ronde waktu/target/manual menutup penerimaan lalu menghabiskan seluruh antrean. Tidak ada opsi membuang antrean setelah aksi aktif. Hasil target-gol boleh melebihi target akibat drain.
 - Pemenang berdasarkan metrik yang dikunci untuk ronde itu. Jika sama, semua yang seri ditampilkan; tidak ada tie-break tersembunyi.
-- Pause menolak gift baru dan menahan antrean; animasi aktif selesai. Resume memperpanjang deadline sebesar durasi pause.
+- Pause menolak gift dan like baru serta menahan antrean; animasi aktif selesai. Resume memperpanjang deadline sebesar durasi pause.
 - `goals += 1` dan `skillPoints += weight` hanya untuk GOAL resmi. `giftPoints` dan `kicks` bertambah ketika aksi resmi selesai, termasuk SAVE/MISS. Demo tidak mengubah metrik.
 - Supporter scoreboard adalah kontribusi dalam ronde aktif, dapat mencakup beberapa klub jika viewer pindah. Aksi lama tetap pada klub snapshot.
 - Tidak ada refund atau penolakan transaksi TikTok; status penolakan hanya menyangkut aksi permainan.

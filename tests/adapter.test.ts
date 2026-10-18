@@ -22,6 +22,23 @@ const gift = {
   streakable: true,
 };
 describe('audited connector contract', () => {
+  it('normalizes per-event likeCount and ignores the cumulative room total', () => {
+    expect(
+      normalizeConnector(
+        envelope('like', { username: 'alice', likeCount: 12, totalLikeCount: 90000 }),
+        '',
+        now,
+      ),
+    ).toMatchObject({ type: 'like', userId: 'alice', likeCount: 12 });
+  });
+  it.each([undefined, 0, -1, 1.5, 1000001])(
+    'rejects invalid connector likeCount %s',
+    (likeCount) => {
+      expect(() =>
+        normalizeConnector(envelope('like', { username: 'alice', likeCount }), '', now),
+      ).toThrow();
+    },
+  );
   it('normalizes real Node connector chat fields', () => {
     expect(
       normalizeConnector(envelope('chat', { username: 'alice', message: ' rma ' }), '123', now),

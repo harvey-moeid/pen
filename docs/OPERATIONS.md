@@ -52,6 +52,12 @@ GitHub environment `production` dapat diberi aturan branch `main` dan required r
 
 Jika smoke test gagal setelah upload, kode baru mungkin sudah aktif. Workflow melaporkan gagal dan **tidak otomatis rollback**, karena rollback kode tidak mengembalikan storage. Periksa log Worker sebelum melakukan pemulihan.
 
+## Pengaturan like dan logo
+
+- **Admin → Like → tendangan**: aktifkan fitur, isi jumlah like per Normal Kick, simpan. Aktifkan skill NORMAL pada **Skill & peluang**. Default fitur nonaktif, ambang 100. Pilih event `like` pada webhook konektor selain `chat`, `gift`, `stream`.
+- Hitungan per penonton setelah memilih klub. Contoh ambang 100: 250 like menghasilkan 2 tendangan dan sisa 50. Like sebelum pilih klub atau di luar LIVE/pause tidak dihitung. Ambang/toggle berubah, pindah klub, dan ronde baru/reset menghapus sisa; perubahan unrelated seperti volume tidak menghapus sisa.
+- **Admin → Klub**: logo menerima PNG/WebP/JPG, model karakter menerima GLB. Keduanya opsional, masing-masing maksimal 20 MB. Simpan konfigurasi setelah upload. Tombol logo/model bawaan menghapus referensi aset dari klub tanpa menghapus objek R2.
+
 ## OBS / TikTok LIVE Studio
 
 - Browser source: `https://<domain>/live`, portrait 1080×1920 atau landscape 1920×1080.

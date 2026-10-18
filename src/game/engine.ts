@@ -1,5 +1,6 @@
 import {
   defaultConfig,
+  defaultLikeSettings,
   emptyScore,
   skillIds,
   type Config,
@@ -9,7 +10,14 @@ import {
   type Receipt,
   type Outcome,
   type Result,
+  type Skill,
+  type Viewer,
 } from './model';
+export function restoreState(serialized: string): RoomState {
+  const state: RoomState = JSON.parse(serialized);
+  state.config.likes ??= defaultLikeSettings();
+  return state;
+}
 export function initialState(now = Date.now(), config = defaultConfig()): RoomState {
   return {
     schema: 1,
@@ -57,6 +65,40 @@ export function matchGift(c: Config, gift: { id: string; coins: number }) {
       a.id.localeCompare(b.id),
   )[0];
 }
+function enqueue(
+  s: RoomState,
+  e: GameEvent,
+  viewer: Viewer,
+  skill: Skill,
+  units: number,
+  contribution: number,
+  now: number,
+  source: 'GIFT' | 'LIKE',
+): Receipt {
+  for (let i = 0; i < units; i++) {
+    s.queue.push({
+      id: `${e.id}:${i}`,
+      eventId: e.id,
+      matchId: s.matchId,
+      clubId: viewer.clubId,
+      supporterId: 'u:' + e.userId,
+      supporterName: viewer.displayName,
+      skill: structuredClone(skill),
+      contribution,
+      queuedAt: now,
+      sequence: ++s.sequence,
+      overtakes: 0,
+      demo: false,
+      configVersion: s.configVersion,
+      source,
+    });
+  }
+  viewer.seenAt = now;
+  s.lastActivity = now;
+  s.nextDemoAt = now + s.config.idle.timeoutMs;
+  s.stats.accepted += units;
+  return { status: 'queued', actions: units };
+}
 export function ingest(s: RoomState, e: GameEvent, now: number): Receipt {
   s.connector.lastEventAt = now;
   s.connector.delayMs = Math.max(0, now - e.at);
@@ -94,8 +136,35 @@ export function ingest(s: RoomState, e: GameEvent, now: number): Receipt {
       changedAt: viewer?.clubId === club.id ? viewer.changedAt : now,
       seenAt: now,
       score: viewer?.score ?? emptyScore(),
+      likeRemainder: viewer?.clubId === club.id ? (viewer.likeRemainder ?? 0) : 0,
     };
     return { status: 'club_selected', message: club.code };
+  }
+  if (e.type === 'like') {
+    if (!s.config.likes.enabled) return { status: 'likes_disabled' };
+    const count = e.likeCount;
+    if (count === undefined || !Number.isInteger(count) || count < 1 || count > 1000000)
+      return reject('invalid_like_count', 'Jumlah like tidak valid');
+    if (!viewer || !s.config.clubs.some((c) => c.id === viewer.clubId && c.enabled))
+      return reject('no_club', 'Pilih klub dulu!');
+    if (s.status !== 'LIVE' || s.pausedAt !== null)
+      return reject('round_closed', 'Ronde tidak menerima like');
+    const skill = s.config.skills.find((k) => k.id === 'NORMAL' && k.enabled);
+    if (!skill) return reject('normal_disabled', 'Aktifkan skill Normal Kick untuk tendangan like');
+    const total = (viewer.likeRemainder ?? 0) + count;
+    const units = Math.floor(total / s.config.likes.likesPerKick);
+    if (s.queue.length + units > s.config.queue.capacity)
+      return reject('queue_full', 'Antrean penuh; event perlu dikirim ulang', true);
+    viewer.likeRemainder = total % s.config.likes.likesPerKick;
+    viewer.seenAt = now;
+    s.lastActivity = now;
+    s.nextDemoAt = now + s.config.idle.timeoutMs;
+    if (!units)
+      return { status: 'likes_accumulated', actions: 0, remainingLikes: viewer.likeRemainder };
+    return {
+      ...enqueue(s, e, viewer, skill, units, 0, now, 'LIKE'),
+      remainingLikes: viewer.likeRemainder,
+    };
   }
   const gift = e.gift;
   if (!gift || !gift.final) return { status: 'streak_pending' };
@@ -108,28 +177,7 @@ export function ingest(s: RoomState, e: GameEvent, now: number): Receipt {
   if (!mapping || !skill) return reject('unmapped', 'Gift belum dipetakan');
   if (s.queue.length + gift.units > s.config.queue.capacity)
     return reject('queue_full', 'Antrean penuh; event perlu dikirim ulang', true);
-  for (let i = 0; i < gift.units; i++) {
-    s.queue.push({
-      id: `${e.id}:${i}`,
-      eventId: e.id,
-      matchId: s.matchId,
-      clubId: viewer.clubId,
-      supporterId: userKey,
-      supporterName: viewer.displayName,
-      skill: structuredClone(skill),
-      contribution: mapping.contributionPoints,
-      queuedAt: now,
-      sequence: ++s.sequence,
-      overtakes: 0,
-      demo: false,
-      configVersion: s.configVersion,
-    });
-  }
-  viewer.seenAt = now;
-  s.lastActivity = now;
-  s.nextDemoAt = now + s.config.idle.timeoutMs;
-  s.stats.accepted += gift.units;
-  return { status: 'queued', actions: gift.units };
+  return enqueue(s, e, viewer, skill, gift.units, mapping.contributionPoints, now, 'GIFT');
 }
 export function pickNext(s: RoomState, now: number): Kick | undefined {
   if (!s.queue.length) return;
@@ -163,7 +211,10 @@ export function startRound(s: RoomState, now: number) {
     s.matchId = `round-${s.round}`;
   }
   s.scores = Object.fromEntries(s.config.clubs.map((c) => [c.id, emptyScore()]));
-  for (const v of Object.values(s.viewers)) v.score = emptyScore();
+  for (const v of Object.values(s.viewers)) {
+    v.score = emptyScore();
+    v.likeRemainder = 0;
+  }
   s.status = 'COUNTDOWN';
   s.phaseEndsAt = now + s.config.match.countdownSec * 1000;
   s.deadline = null;
@@ -312,7 +363,10 @@ export function control(s: RoomState, action: string, now: number) {
     s.status = 'WAITING';
     s.phaseEndsAt = null;
     s.scores = Object.fromEntries(s.config.clubs.map((c) => [c.id, emptyScore()]));
-    for (const v of Object.values(s.viewers)) v.score = emptyScore();
+    for (const v of Object.values(s.viewers)) {
+      v.score = emptyScore();
+      v.likeRemainder = 0;
+    }
   } else throw Error('Kontrol tidak dikenal');
   audit(s, now, 'control', action);
 }
@@ -334,6 +388,8 @@ export function configure(s: RoomState, c: Config, now: number) {
     'config',
     JSON.stringify({ from: s.configVersion, to: s.configVersion + 1, before: s.config, after: c }),
   );
+  if (JSON.stringify(s.config.likes) !== JSON.stringify(c.likes))
+    for (const viewer of Object.values(s.viewers)) viewer.likeRemainder = 0;
   s.config = c;
   s.configVersion++;
   for (const club of c.clubs) s.scores[club.id] ??= emptyScore();
@@ -347,6 +403,7 @@ export function publicSnapshot(s: RoomState, now: number) {
           supporterName: k.supporterName,
           skill: k.skill,
           demo: k.demo,
+          source: k.source ?? (k.demo ? 'DEMO' : 'GIFT'),
           outcome: k.outcome,
           startedAt: k.startedAt,
           endsAt: k.endsAt,
@@ -360,14 +417,24 @@ export function publicSnapshot(s: RoomState, now: number) {
     configVersion: s.configVersion,
     clubs: s.config.clubs.filter((c) => c.enabled).sort((a, b) => a.sortOrder - b.sortOrder),
     skills: s.config.skills,
+    likes: s.config.likes,
     giftLegend: s.config.skills
       .filter((skill) => skill.enabled)
       .map((skill) => ({
         skillId: skill.id,
         skillLabel: skill.label,
-        triggers: s.config.mappings
-          .filter((m) => m.enabled && m.skillId === skill.id && (m.giftId || s.config.coinFallback))
-          .map((m) => m.displayName || (m.giftId ? 'Gift khusus' : `${m.coinValueFallback} koin`)),
+        triggers: [
+          ...(skill.id === 'NORMAL' && s.config.likes.enabled
+            ? [`${s.config.likes.likesPerKick} like / penonton`]
+            : []),
+          ...s.config.mappings
+            .filter(
+              (m) => m.enabled && m.skillId === skill.id && (m.giftId || s.config.coinFallback),
+            )
+            .map(
+              (m) => m.displayName || (m.giftId ? 'Gift khusus' : `${m.coinValueFallback} koin`),
+            ),
+        ],
       })),
     visual: s.config.visual,
     ranking: s.config.match.ranking,

@@ -151,6 +151,7 @@ try {
     'integration',
     'clubs',
     'gifts',
+    'likes',
     'skills',
     'goalkeeper',
     'match',
@@ -166,7 +167,24 @@ try {
       false,
     );
   }
-  checks.push('Admin login and all 11 admin routes render');
+  checks.push('Admin login and all 12 admin routes render');
+  await page.goto(base + '/admin/clubs');
+  await expect(page.getByText('Logo klub berupa gambar (PNG/WebP/JPG, maks. 20 MB)')).toHaveCount(
+    5,
+  );
+  await expect(page.getByText('Model karakter 3D opsional (GLB, maks. 20 MB)')).toHaveCount(5);
+  await page.goto(base + '/admin/likes');
+  await page.getByLabel('Aktifkan tendangan dari like').check();
+  await page.getByLabel('Jumlah like per tendangan normal').fill('100');
+  await page.getByRole('button', { name: 'Simpan perubahan' }).click();
+  await expect(page.getByRole('status')).toContainText('tersimpan');
+  await page.reload();
+  await expect(page.getByLabel('Aktifkan tendangan dari like')).toBeChecked();
+  await expect(page.getByLabel('Jumlah like per tendangan normal')).toHaveValue('100');
+  await page.screenshot({ path: join(out, 'admin-likes.png'), fullPage: true });
+  checks.push(
+    'Admin like threshold and toggle persist; logo image and optional GLB labels are distinct',
+  );
   await page.goto(base + '/admin/skills');
   await page.getByLabel('Peluang gol (%)').first().fill('61.5');
   await page.getByRole('button', { name: 'Simpan perubahan' }).click();
@@ -181,6 +199,8 @@ try {
   data.config.idle.enabled = false;
   data.config.skills[1].goalChancePercent = 100;
   data.config.skills[1].durationMs = 3000;
+  data.config.skills[0].goalChancePercent = 100;
+  data.config.skills[0].durationMs = 3000;
   assert.equal(
     (
       await context.request.put(base + '/api/admin/config', {
@@ -251,16 +271,40 @@ try {
   assert.equal(await page.locator('img[src="x"]').count(), 0);
   await page.screenshot({ path: join(out, 'live-portrait.png'), fullPage: true });
   checks.push('Signed webhook → realtime overlay goal; supporter text cannot inject HTML');
+  const partial = await hook(
+    'like',
+    { username: 'test-viewer', likeCount: 60, totalLikeCount: 90000 },
+    'like-partial',
+  );
+  assert.equal((await partial.json()).remainingLikes, 60);
+  const triggered = await hook('like', { username: 'test-viewer', likeCount: 50 }, 'like-trigger');
+  assert.equal((await triggered.json()).actions, 1);
+  await expect(page.locator('.kick-announcement')).toContainText('LIKE');
+  await expect(page.getByText('Setiap 100 like per penonton', { exact: false })).toBeVisible();
+  await expect(
+    page.locator('.live-scores > div').filter({ hasText: 'BAR' }).locator('strong'),
+  ).toHaveText('2', { timeout: 15000 });
+  const likeAfter = await (await context.request.get(base + '/api/snapshot')).json();
+  assert.equal(likeAfter.scores.bar.giftPoints, 1);
+  assert.equal(
+    (await (await hook('like', { username: 'test-viewer', likeCount: 50 }, 'like-trigger')).json())
+      .status,
+    'duplicate',
+  );
+  await page.screenshot({ path: join(out, 'live-likes.png'), fullPage: true });
+  checks.push(
+    'Signed likes cross threshold once, show Normal Kick, preserve gift points, and deduplicate retry',
+  );
   const authoritativeBefore = await (await context.request.get(base + '/api/snapshot')).json();
   await page.reload();
   await expect(
     page.locator('.live-scores>div').filter({ hasText: 'BAR' }).locator('strong'),
-  ).toHaveText('1');
+  ).toHaveText('2');
   const another = await context.newPage();
   await another.goto(base + '/live');
   await expect(
     another.locator('.live-scores>div').filter({ hasText: 'BAR' }).locator('strong'),
-  ).toHaveText('1');
+  ).toHaveText('2');
   await another.close();
   const after = await (await context.request.get(base + '/api/snapshot')).json();
   assert.deepEqual(after.scores, authoritativeBefore.scores);

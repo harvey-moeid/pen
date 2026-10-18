@@ -58,6 +58,16 @@ export function normalizeConnector(input: unknown, expectedRoom: string, now: nu
       },
     };
   }
+  if (e.event === 'like') {
+    const d = Who.extend({ likeCount: z.number().int().min(1).max(1000000) }).parse(e.data);
+    return {
+      ...base,
+      type: 'like',
+      userId: d.username,
+      displayName: d.nickname || d.username,
+      likeCount: d.likeCount,
+    };
+  }
   if (e.event === 'stream')
     return {
       ...base,

@@ -8,6 +8,7 @@ import {
   configure,
   control,
   audit,
+  restoreState,
 } from '../game/engine';
 import { normalizeConnector } from './adapter';
 export class MatchRoom extends DurableObject<Env> {
@@ -37,7 +38,7 @@ export class MatchRoom extends DurableObject<Env> {
     this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
   }
   private read(): RoomState {
-    return JSON.parse(
+    return restoreState(
       this.ctx.storage.sql.exec<{ json: string }>('SELECT json FROM state WHERE id=1').one().json,
     );
   }

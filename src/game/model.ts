@@ -51,12 +51,19 @@ export const MappingSchema = z
     (v) => v.giftId !== undefined || v.coinValueFallback !== undefined,
     'Isi Gift ID atau nilai koin',
   );
+export const defaultLikeSettings = () => ({ enabled: false, likesPerKick: 100 });
 export const ConfigSchema = z
   .object({
     clubs: z.array(ClubSchema).min(1).max(8),
     skills: z.array(SkillSchema).length(5),
     mappings: z.array(MappingSchema).max(100),
     coinFallback: z.boolean(),
+    likes: z
+      .object({
+        enabled: z.boolean(),
+        likesPerKick: z.number().int().min(1).max(1000000),
+      })
+      .default(defaultLikeSettings),
     match: z.object({
       mode: z.enum(['TIME', 'TARGET_GOALS', 'ENDLESS']),
       durationSec: z.number().int().min(10).max(86400),
@@ -114,6 +121,7 @@ export type Viewer = {
   changedAt: number;
   seenAt: number;
   score: Score;
+  likeRemainder?: number;
 };
 export type Kick = {
   id: string;
@@ -132,6 +140,7 @@ export type Kick = {
   startedAt?: number;
   endsAt?: number;
   configVersion: number;
+  source?: 'GIFT' | 'LIKE';
 };
 export type MatchStatus = 'WAITING' | 'COUNTDOWN' | 'LIVE' | 'CLOSING' | 'RESULT' | 'INTERMISSION';
 export type Result = {
@@ -173,14 +182,21 @@ export type RoomState = {
 };
 export type GameEvent = {
   id: string;
-  type: 'comment' | 'gift' | 'connected' | 'disconnected' | 'reconnecting' | 'ignored';
+  type: 'comment' | 'gift' | 'like' | 'connected' | 'disconnected' | 'reconnecting' | 'ignored';
   at: number;
   userId?: string;
   displayName?: string;
   comment?: string;
   gift?: { id: string; coins: number; units: number; final: boolean };
+  likeCount?: number;
 };
-export type Receipt = { status: string; actions?: number; message?: string; retryable?: boolean };
+export type Receipt = {
+  status: string;
+  actions?: number;
+  message?: string;
+  retryable?: boolean;
+  remainingLikes?: number;
+};
 export const emptyScore = (): Score => ({ goals: 0, skillPoints: 0, giftPoints: 0, kicks: 0 });
 export function defaultConfig(): Config {
   return {
@@ -218,6 +234,7 @@ export function defaultConfig(): Config {
       matchPriority: 10,
     })),
     coinFallback: true,
+    likes: defaultLikeSettings(),
     match: {
       mode: 'TIME',
       durationSec: 300,
