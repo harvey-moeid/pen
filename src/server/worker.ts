@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ConfigSchema } from '../game/model';
 import { authorized, boundedBody, boundedBytes, digest, passwordMatches, session } from './auth';
-import { verifyWebhook } from './adapter';
+import { isKonekliveTest, verifyWebhook } from './adapter';
 export { MatchRoom } from './room';
 const json = (value: unknown, status = 200) =>
   Response.json(value, {
@@ -29,7 +29,9 @@ export default {
           return json({ error: 'invalid_signature' }, 401);
         if (!(await room.allow('webhooks', 6000, 60000)))
           return json({ error: 'rate_limited', retryable: true }, 429);
-        const result = await room.receive(JSON.parse(raw));
+        const payload: unknown = JSON.parse(raw);
+        if (isKonekliveTest(payload)) return json({ status: 'test_received', is_test: true });
+        const result = await room.receive(payload);
         return json(result, result.retryable ? 503 : 200);
       }
       if (path.startsWith('/api/admin/')) {
@@ -82,8 +84,9 @@ export default {
           return json({
             configured: Boolean(env.WEBHOOK_SIGNING_SECRET),
             endpoint: `${url.origin}/api/hooks/tiktok`,
-            contract: 'tiktok-live-konektor@3660b385',
-            dedup: 'Webhook event.id; upstream replay with new IDs remains unverified',
+            contract: 'koneklive Standard JSON + tiktok-live-konektor@3660b385',
+            dedup:
+              'Webhook event.id; koneklive gift delta_count; upstream replay remains unverified',
           });
         if (path === '/api/admin/assets' && request.method === 'POST') {
           const type = request.headers.get('Content-Type') ?? '';

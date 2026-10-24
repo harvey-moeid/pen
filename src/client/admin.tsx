@@ -388,15 +388,16 @@ export function Admin() {
         {page === 'integration' && (
           <>
             <section className="panel padded">
-              <h3>Webhook live-tiktok-konektor</h3>
+              <h3>Webhook koneklive / live-tiktok-konektor</h3>
               <p>
                 Status secret:{' '}
                 <b>{integration?.configured ? 'Terkonfigurasi' : 'Belum tersedia'}</b>
               </p>
               <code className="code-block">{integration?.endpoint ?? '/api/hooks/tiktok'}</code>
               <p>
-                Tambahkan endpoint ini pada dashboard konektor. Pilih event chat, gift, like,
-                stream. Samakan WEBHOOK_SIGNING_SECRET melalui secret Worker dan konektor.
+                Tambahkan endpoint ini pada dashboard konektor. Untuk koneklive, pilih comment,
+                gift, like; konektor lama memakai chat, gift, like, stream. Samakan
+                WEBHOOK_SIGNING_SECRET dengan HMAC secret integrasi webhook tersebut.
               </p>
               <Field
                 label="Filter Room ID TikTok (opsional)"
@@ -415,13 +416,14 @@ export function Admin() {
                 signing secret khusus untuk konektor sumber game ini.
               </p>
               <div className="notice">
-                Versi kode konektor yang diaudit (bukan Room ID): {integration?.contract}. Dedup
-                menjamin retry dengan event.id yang sama. Konektor belum meneruskan ID pesan TikTok
-                asli; replay upstream dengan ID baru perlu verifikasi sebelum produksi.
+                Format yang didukung (bukan Room ID): {integration?.contract}. Retry dengan event.id
+                yang sama tidak dihitung ulang. Replay upstream dengan ID baru tetap perlu
+                verifikasi sebelum produksi.
               </div>
               <p>
-                Combo streakable dihitung hanya saat repeatEnd=true. Gift tanpa klub ditolak sebagai
-                aksi game. Antrean penuh mengembalikan 503 agar dapat diretry.
+                Koneklive menghitung gift dari delta_count; konektor lama menunggu repeatEnd=true.
+                Event TEST diterima tanpa menambah skor. Like gabungan tanpa identitas penonton
+                diabaikan. Antrean penuh mengembalikan 503 agar dapat diretry.
               </p>
               <Field
                 label="Retensi data penonton & riwayat (hari)"

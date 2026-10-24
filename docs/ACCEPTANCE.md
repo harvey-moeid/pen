@@ -41,3 +41,7 @@ Pengaturan teks overlay mencakup 24 bagian, warna, ukuran, visibilitas, reset, d
 `npm run check` menjalankan typecheck, lint, tes engine/adapter/runtime, dan build. `npm run test:browser` setelah build menjalankan studio, login/form admin, input berbahaya sebagai teks, webhook HMAC, sinkronisasi overlay, dan screenshot portrait/landscape dalam environment terisolasi. Laporan ada pada `artifacts/browser-report.json`; CI mengunggah folder tersebut sebagai artefak.
 
 Dokumen ini sengaja tidak memberi angka "99,9% selesai" yang tidak dapat dibuktikan. Kesiapan produksi ditentukan oleh acceptance lapangan di atas.
+
+## Koneklive compatibility — 24 Oktober 2026
+
+`npm run check` lulus: TypeScript, ESLint, 112 tes unit/integrasi (termasuk 3 tes Worker koneklive), dan build Vite. Tes lokal memverifikasi HMAC baru/lama, penolakan secret salah, TEST tanpa perubahan room/skor, komentar klub, delta combo, retry serentak, serta like individual dan gabungan. Delivery produksi dan TikTok LIVE masih memerlukan secret tujuan yang sama dan pengujian lapangan.

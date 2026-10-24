@@ -1,5 +1,51 @@
 # Audit dan kontrak konektor
 
+## Koneklive (Standard JSON)
+
+Endpoint yang sama, `POST /api/hooks/tiktok`, menerima `koneklive` dan konektor lama.
+Untuk koneklive, pilih event **comment, gift, like** pada integrasi webhook. Salin
+**HMAC secret integrasi tersebut** ke `WEBHOOK_SIGNING_SECRET` game. Untuk CD,
+perbarui secret GitHub Actions di repo `pen` (atau environment `production` jika
+diatur di sana), lalu jalankan workflow. Perubahan hanya di Cloudflare Dashboard
+akan ditimpa CD berikutnya. Jangan memakai API key REST, password admin, atau
+`CONFIG_WORKER_BEARER_TOKEN` sebagai HMAC secret. Satu receiver memakai satu secret;
+dua konektor berbeda hanya dapat dipakai jika nilai signing secret-nya sama.
+
+Header koneklive: `X-Webhook-Timestamp` dan `X-Webhook-Signature`. Header lama
+`X-TLK-Timestamp` dan `X-TLK-Signature` tetap diterima. Keduanya memakai
+`sha256=<hex HMAC-SHA256>` atas `timestamp + "." + exactRawBody`, toleransi ±300 detik.
+Pasangan header tidak boleh dicampur; raw body selalu diverifikasi sebelum parsing.
+
+| Koneklive                                   | Data game                                                                                    |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `type: comment`, `data.comment`             | Pilihan klub dari komentar                                                                   |
+| `user.username`                             | Identitas yang sama dengan konektor lama; `user.id` menjadi fallback jika username tidak ada |
+| `source.room_id`                            | Filter Room ID opsional, bukan username streamer                                             |
+| `data.gift_id`, `data.coins_per_gift`       | Gift ID dan nilai koin per unit                                                              |
+| `data.delta_count`                          | Unit gift tambahan, bukan total `repeat_count`                                               |
+| `data.like_count`, `data.aggregated: false` | Delta like per penonton                                                                      |
+
+Gift koneklive dihitung dari delta positif, termasuk update combo sebelum final.
+Final combo dengan `delta_count: 0` diabaikan; tidak menjumlahkan `repeat_count`
+lagi. Delta tidak diketahui/invalid ditolak. Koin `null` tetap dapat memakai mapping
+Gift ID, tetapi tidak cocok dengan fallback nilai koin. Retry dengan ID event yang
+sama tetap melewati dedup persisten game.
+
+Tombol TEST koneklive (`is_test: true`) yang bertanda tangan sah mendapat
+`200 {"status":"test_received","is_test":true}` tanpa mengubah room, pilihan klub,
+skor, antrean, atau status LIVE. TEST memeriksa delivery dan signature, bukan bukti
+TikTok LIVE. Like gabungan (`aggregated: true`) diabaikan karena koneklive dapat
+menggabungkan penonton dan menghapus identitas; tidak boleh dikreditkan ke klub
+acak. Like individual tetap mengikuti ambang dan aturan klub game. Event lain
+seperti join/viewer diabaikan. Koneklive saat ini tidak mengirim lifecycle stream;
+status sumber game diperbarui dari event gameplay sah, bukan TEST.
+
+Uji lokal mencakup HMAC baru/lama, room/expiry, delta combo, koin null, TEST tanpa
+efek gameplay, retry serentak, komentar klub dan like per penonton. Penerimaan
+TikTok LIVE nyata masih memerlukan verifikasi lapangan.
+
+## Kontrak konektor lama
+
 Audit read-only repository `harvey-moeid/tiktok-live-konektor`, commit **3660b385078318e2d10782ddf1e00dc8492d3b28**. Repository konektor tidak diubah dalam implementasi ini.
 
 Sumber yang diperiksa: `server/events.js`, `server/gifts.js`, `server/tiktok.js`, `server/webhooks.js`, `server/webhook-delivery.js`, `python_fallback/events.py`, `docs/INTEGRASI_WEBSITE.md`.

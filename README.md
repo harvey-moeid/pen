@@ -51,7 +51,16 @@ Di **Admin → Klub → Event tanpa komentar klub**, aktifkan **Gacha klub jika 
 
 Mode gacha awalnya **nonaktif**, termasuk untuk konfigurasi lama. Saat aktif, like penonton tanpa pilihan klub tetap dihitung per penonton dan baru mengundi ketika mencapai ambang; fitur like harus diaktifkan tersendiri. Perubahan mode gacha atau komentar pertama setelah gacha menghapus sisa like penonton gacha. Jika mode gacha dimatikan, event berikutnya dari penonton itu kembali memerlukan komentar klub.
 
-## Like → tendangan normal
+## Koneklive baru
+
+Webhook `/api/hooks/tiktok` juga menerima **koneklive Standard JSON** dengan header
+`X-Webhook-Timestamp` / `X-Webhook-Signature`. Pilih event **comment, gift, like**
+di koneklive dan samakan HMAC secret integrasi dengan `WEBHOOK_SIGNING_SECRET`
+game melalui secret GitHub Actions sebelum CD. TEST diterima tanpa skor; combo
+dihitung dari `delta_count`. Like gabungan tanpa identitas tidak dikreditkan.
+Konektor lama tetap didukung. Lihat [kontrak dan pengaturan secret](docs/INTEGRATION.md#koneklive-standard-json).
+
+## Like → tendangan normal (pengaturan)
 
 Di **Admin → Like → tendangan**, aktifkan fitur dan isi **Jumlah like per tendangan normal** (1–1.000.000; nilai awal 100). Konfigurasi lama mendapat fitur dalam keadaan nonaktif agar deploy tidak mengubah aturan pertandingan yang sedang berjalan. Tambahkan event **like** pada daftar event webhook konektor, bersama **chat, gift, stream**.
 

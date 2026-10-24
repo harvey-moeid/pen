@@ -192,7 +192,7 @@ export type GameEvent = {
   userId?: string;
   displayName?: string;
   comment?: string;
-  gift?: { id: string; coins: number; units: number; final: boolean };
+  gift?: { id: string; coins: number | null; units: number; final: boolean };
   likeCount?: number;
 };
 export type Receipt = {

@@ -54,12 +54,12 @@ export function audit(s: RoomState, now: number, action: string, detail: string)
   s.audit.unshift({ at: now, action, detail });
   s.audit = s.audit.slice(0, 100);
 }
-export function matchGift(c: Config, gift: { id: string; coins: number }) {
+export function matchGift(c: Config, gift: { id: string; coins: number | null }) {
   const candidates = c.mappings.filter(
     (m) =>
       m.enabled &&
       ((m.giftId && m.giftId === gift.id) ||
-        (!m.giftId && c.coinFallback && m.coinValueFallback === gift.coins)),
+        (!m.giftId && c.coinFallback && gift.coins !== null && m.coinValueFallback === gift.coins)),
   );
   return candidates.sort(
     (a, b) =>
